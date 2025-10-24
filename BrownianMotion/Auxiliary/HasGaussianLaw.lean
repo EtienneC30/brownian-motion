@@ -1,4 +1,5 @@
 import BrownianMotion.Gaussian.Gaussian
+import Mathlib.MeasureTheory.Constructions.Cylinders
 import Mathlib.Probability.Independence.CharacteristicFunction
 
 open MeasureTheory ProbabilityTheory Finset WithLp Complex
@@ -112,6 +113,253 @@ lemma iIndepFun.hasGaussianLaw {E : ι → Type*}
       · exact IsGaussian.memLp_two_id
       · exact IsGaussian.integrable_id
     · exact fun i ↦ HasGaussianLaw.aemeasurable
+
+open ContinuousLinearMap in
+lemma HasGaussianLaw.iIndepFun_of_cov {E : ι → Type*}
+    [∀ i, NormedAddCommGroup (E i)] [∀ i, NormedSpace ℝ (E i)] [∀ i, MeasurableSpace (E i)]
+    [∀ i, CompleteSpace (E i)] [∀ i, BorelSpace (E i)] [∀ i, SecondCountableTopology (E i)]
+    {X : Π i, Ω → (E i)} (h : HasGaussianLaw (fun ω i ↦ X i ω) P)
+    (h' : ∀ i j, i ≠ j → ∀ (L₁ : StrongDual ℝ (E i)) (L₂ : StrongDual ℝ (E j)),
+      cov[L₁ ∘ (X i), L₂ ∘ (X j); P] = 0) :
+    iIndepFun X P := by
+  have := h.isProbabilityMeasure
+  classical
+  rw [iIndepFun_iff_charFunDual_pi]
+  · intro L
+    simp_rw [IsGaussian.charFunDual_eq]
+    rw [← Complex.exp_sum, sum_sub_distrib, ← sum_mul]
+    · congr
+      · have this ω : L (X · ω) = ∑ i, L (Pi.single i (X i ω)) := by
+          rw [← map_sum, sum_single_apply]
+        rw [integral_map]
+        · simp_rw [this, Complex.ofReal_sum]
+          rw [integral_finset_sum]
+          · congr with i
+            rw [integral_map]
+            · rfl
+            · exact HasGaussianLaw.aemeasurable
+            · fun_prop
+          · rintro i -
+            apply Integrable.ofReal
+            change Integrable (L ∘ (single ℝ E i) ∘ X i) P
+            exact HasGaussianLaw.integrable
+        · exact h.aemeasurable
+        · fun_prop
+      · have this : L ∘ (fun ω i ↦ X i ω) = ∑ i, (L ∘L (single ℝ E i)) ∘ (X i) := by
+          ext ω
+          simp [← map_sum, sum_single_apply]
+        rw [variance_map, this, variance_sum]
+        · simp only [← sum_div, ← ofReal_sum, ne_eq, OfNat.ofNat_ne_zero, not_false_eq_true,
+            div_left_inj', ofReal_inj]
+          congr with i
+          rw [sum_eq_single_of_mem i (by grind) (fun j _ hij ↦ ?_)]
+          · rw [variance_map, covariance_self]
+            · exact HasGaussianLaw.aemeasurable
+            · fun_prop
+            · exact HasGaussianLaw.aemeasurable
+          exact h' i j hij.symm _ _
+        · exact fun _ ↦ HasGaussianLaw.memLp_two
+        · fun_prop
+        · exact HasGaussianLaw.aemeasurable
+  · exact fun _ ↦ HasGaussianLaw.aemeasurable
+
+lemma test {ι κ : Type*} {𝓧 : ι → Type*} {𝓨 : κ → Type*} [∀ i, MeasurableSpace (𝓧 i)]
+    [∀ j, MeasurableSpace (𝓨 j)] {X : (i : ι) → Ω → 𝓧 i} {Y : (j : κ) → Ω → 𝓨 j}
+    (hX : ∀ i, Measurable (X i)) (hY : ∀ j, Measurable (Y j))
+    (h : ∀ (S : Finset ι) (T : Finset κ),
+      IndepFun (fun ω (i : S) ↦ X i ω) (fun ω (j : T) ↦ Y j ω) P) [IsProbabilityMeasure P] :
+    IndepFun (fun ω i ↦ X i ω) (fun ω j ↦ Y j ω) P := by
+  let πSβ := MeasureTheory.squareCylinders (fun i ↦ {s : Set (𝓧 i) | MeasurableSet s})
+  let πS := { s : Set Ω | ∃ t ∈ πSβ, (fun ω i => X i ω) ⁻¹' t = s }
+  have hπS_pi : IsPiSystem πS := by
+    refine IsPiSystem.comap (isPiSystem_squareCylinders ?_ ?_) _
+    · exact fun i ↦ MeasurableSpace.isPiSystem_measurableSet
+    · simp
+  have hπS_gen : (MeasurableSpace.pi.comap fun a i => X i a) = .generateFrom πS := by
+    rw [generateFrom_squareCylinders.symm, MeasurableSpace.comap_generateFrom]
+    congr
+  let πTβ := squareCylinders (fun j ↦ {s : Set (𝓨 j) | MeasurableSet s})
+  let πT := { s : Set Ω | ∃ t ∈ πTβ, (fun a j => Y j a) ⁻¹' t = s }
+  have hπT_pi : IsPiSystem πT := by
+    refine IsPiSystem.comap (isPiSystem_squareCylinders ?_ ?_) _
+    · exact fun i ↦ MeasurableSpace.isPiSystem_measurableSet
+    · simp
+  have hπT_gen : (MeasurableSpace.pi.comap fun a j => Y j a) = .generateFrom πT := by
+    rw [generateFrom_squareCylinders.symm, MeasurableSpace.comap_generateFrom]
+    congr
+  -- To prove independence, we prove independence of the generating π-systems.
+  refine IndepSets.indep (Measurable.comap_le (measurable_pi_iff.mpr fun i => hX i))
+    (Measurable.comap_le (measurable_pi_iff.mpr fun i => hY i)) hπS_pi hπT_pi hπS_gen hπT_gen
+    ((IndepSets_iff _ _ _).2 ?_)
+  rintro - - ⟨s, ⟨sets_s, hs1, hs2, rfl⟩, rfl⟩ ⟨t, ⟨sets_t, ht1, ht2, rfl⟩, rfl⟩
+  simp only [Set.mem_pi, Set.mem_univ, Set.mem_setOf_eq, forall_const] at hs2 ht2
+  have : (fun ω i ↦ X i ω) ⁻¹' sets_s.toSet.pi hs1 ∩ (fun a j ↦ Y j a) ⁻¹' sets_t.toSet.pi ht1 =
+      (fun ω (i : sets_s) ↦ X i ω) ⁻¹' (Finset.univ).toSet.pi (fun i ↦ hs1 i) ∩
+      (fun a (j : sets_t) ↦ Y j a) ⁻¹' Finset.univ.toSet.pi (fun j ↦ ht1 j) := by
+    ext; simp
+  rw [this, (h sets_s sets_t).meas_inter]
+  · congr 2
+    · ext; simp
+    · ext; simp
+  · apply MeasurableSet.preimage
+    · exact MeasurableSet.pi (Finset.countable_toSet _) (fun _ _ ↦ hs2 _)
+    · exact comap_measurable _
+  · apply MeasurableSet.preimage
+    · exact MeasurableSet.pi (Finset.countable_toSet _) (fun _ _ ↦ ht2 _)
+    · exact comap_measurable _
+
+lemma test' {ι : Type*} {κ : ι → Type*} {𝓧 : (i : ι) → (j : κ i) → Type*}
+    [∀ i j, MeasurableSpace (𝓧 i j)] {X : (i : ι) → (j : κ i) → Ω → 𝓧 i j}
+    (hX : ∀ i j, Measurable (X i j))
+    (h : ∀ (S : Finset ι) (T : (i : S) → Finset (κ i)),
+      iIndepFun (fun i ω (j : T i) ↦ X i j ω) P) [IsProbabilityMeasure P] :
+    iIndepFun (fun i ω j ↦ X i j ω) P := by
+  let πsys (i : ι) := squareCylinders (fun j ↦ {s : Set (𝓧 i j) | MeasurableSet s})
+  let πsys' i := {s : Set Ω | ∃ t ∈ πsys i, (fun ω j ↦ X i j ω) ⁻¹' t = s}
+  have πsys'_pi i : IsPiSystem (πsys' i) := by
+    refine IsPiSystem.comap (isPiSystem_squareCylinders ?_ ?_) _
+    · exact fun i ↦ MeasurableSpace.isPiSystem_measurableSet
+    · simp
+  have πsys'_gen i : (MeasurableSpace.pi.comap fun ω j ↦ X i j ω) = .generateFrom (πsys' i) := by
+    rw [generateFrom_squareCylinders.symm, MeasurableSpace.comap_generateFrom]
+    congr
+  refine iIndepSets.iIndep (fun i ↦ (Measurable.comap_le (measurable_pi_iff.mpr fun j => hX i j)))
+    πsys' πsys'_pi πsys'_gen ((iIndepSets_iff _ _).2 ?_)
+  intro S f hf
+  simp only [squareCylinders, Set.mem_pi, Set.mem_univ, Set.mem_setOf_eq, forall_const,
+    ↓existsAndEq, and_true, πsys', πsys] at hf
+  choose! T s hs hf using hf
+  rw [Set.iInter₂_congr (fun i hi ↦ (hf i hi).symm),
+    S.prod_congr rfl (fun i hi ↦ congrArg P (hf i hi).symm)]
+  have : (⋂ i ∈ S, (fun ω j ↦ X i j ω) ⁻¹' (T i).toSet.pi (s i)) =
+      (⋂ i ∈ (univ : Finset S), (fun ω (j : T i) ↦ X i j ω) ⁻¹' univ.toSet.pi (fun j ↦ s i j)) := by
+    ext; simp
+  rw [this, (h S (fun i ↦ T i)).measure_inter_preimage_eq_mul, ← S.prod_coe_sort]
+  · congrm ∏ _, P ?_
+    ext; simp
+  · exact fun i _ ↦ .pi (Finset.countable_toSet _) (fun _ _ ↦ hs _ i.2 _)
+
+open ContinuousLinearMap in
+lemma HasGaussianLaw.indepFun_of_cov {E F : Type*}
+    [NormedAddCommGroup E] [NormedSpace ℝ E] [MeasurableSpace E]
+    [CompleteSpace E] [BorelSpace E] [SecondCountableTopology E]
+    [NormedAddCommGroup F] [NormedSpace ℝ F] [MeasurableSpace F]
+    [CompleteSpace F] [BorelSpace F] [SecondCountableTopology F]
+    {X : Ω → E} {Y : Ω → F} (h : HasGaussianLaw (fun ω ↦ (X ω, Y ω)) P)
+    (h' : ∀ (L₁ : StrongDual ℝ E) (L₂ : StrongDual ℝ F), cov[L₁ ∘ X, L₂ ∘ Y; P] = 0) :
+    IndepFun X Y P := by
+  have := h.isProbabilityMeasure
+  have := h.fst
+  have := h.snd
+  rw [indepFun_iff_charFunDual_prod]
+  · intro L
+    have : L ∘ (fun ω ↦ (X ω, Y ω)) = (L ∘L (.inl ℝ E F)) ∘ X + (L ∘L (.inr ℝ E F)) ∘ Y := by
+      ext; simp only [Function.comp_apply, ← comp_inl_add_comp_inr, Pi.add_apply]
+    rw [IsGaussian.charFunDual_eq, h.fst.isGaussian_map.charFunDual_eq,
+      h.snd.isGaussian_map.charFunDual_eq, ← exp_add, sub_add_sub_comm, ← add_mul, integral_map,
+      integral_map, integral_map, integral_complex_ofReal, integral_complex_ofReal,
+      integral_complex_ofReal, ← ofReal_add, ← integral_add, ← add_div, ← ofReal_add,
+      variance_map, variance_map, variance_map, this, variance_add, h', mul_zero, add_zero]
+    · congr
+    · exact (h.fst.map _).memLp_two
+    · exact (h.snd.map _).memLp_two
+    any_goals fun_prop
+    all_goals exact HasGaussianLaw.integrable
+  all_goals fun_prop
+
+open ContinuousLinearMap RealInnerProductSpace in
+lemma HasGaussianLaw.iIndepFun_of_cov' {E : ι → Type*}
+    [∀ i, NormedAddCommGroup (E i)] [∀ i, InnerProductSpace ℝ (E i)] [∀ i, MeasurableSpace (E i)]
+    [∀ i, CompleteSpace (E i)] [∀ i, BorelSpace (E i)] [∀ i, SecondCountableTopology (E i)]
+    {X : Π i, Ω → (E i)} (h : HasGaussianLaw (fun ω i ↦ X i ω) P)
+    (h' : ∀ i j, i ≠ j → ∀ (x : E i) (y : E j),
+      cov[fun ω ↦ ⟪x, X i ω⟫, fun ω ↦ ⟪y, X j ω⟫; P] = 0) :
+    iIndepFun X P := by
+  apply h.iIndepFun_of_cov
+  intro i j hij L₁ L₂
+  simp_rw [← inner_toDual_symm_eq_self]
+  exact h' i j hij _ _
+
+open ContinuousLinearMap RealInnerProductSpace in
+lemma HasGaussianLaw.indepFun_of_cov' {E F : Type*}
+    [NormedAddCommGroup E] [InnerProductSpace ℝ E] [MeasurableSpace E]
+    [CompleteSpace E] [BorelSpace E] [SecondCountableTopology E]
+    [NormedAddCommGroup F] [InnerProductSpace ℝ F] [MeasurableSpace F]
+    [CompleteSpace F] [BorelSpace F] [SecondCountableTopology F]
+    {X : Ω → E} {Y : Ω → F} (h : HasGaussianLaw (fun ω ↦ (X ω, Y ω)) P)
+    (h' : ∀ x y, cov[fun ω ↦ ⟪x, X ω⟫, fun ω ↦ ⟪y, Y ω⟫; P] = 0) :
+    IndepFun X Y P := by
+  apply h.indepFun_of_cov
+  intro L₁ L₂
+  simp_rw [← inner_toDual_symm_eq_self]
+  exact h' _ _
+
+open ContinuousLinearMap RealInnerProductSpace in
+lemma HasGaussianLaw.iIndepFun_of_cov'' {κ : ι → Type*} [∀ i, Fintype (κ i)] [DecidableEq ι]
+    {X : (i : ι) → κ i → Ω → ℝ} (h : HasGaussianLaw (fun ω i j ↦ X i j ω) P)
+    (h' : ∀ i j, i ≠ j → ∀ k l, cov[X i k, X j l; P] = 0) :
+    iIndepFun (fun i ω j ↦ X i j ω) P := by
+  have := h.isProbabilityMeasure
+  have _ i j := (h.eval i).eval j
+  have : (fun i ω j ↦ X i j ω) = fun i ↦ (ofLp ∘ (toLp 2 ∘ fun ω j ↦ X i j ω)) := by
+    ext; simp
+  rw [this]
+  apply iIndepFun.comp
+  · apply (h.toLp_comp_pi 2).iIndepFun_of_cov'
+    intro i j hij x y
+    rw [← (EuclideanSpace.basisFun _ _).sum_repr x, ← (EuclideanSpace.basisFun _ _).sum_repr y]
+    simp_rw [sum_inner, inner_smul_left]
+    rw [covariance_fun_sum_fun_sum]
+    · simp only [EuclideanSpace.basisFun_repr, conj_trivial, Function.comp_apply,
+        EuclideanSpace.basisFun_inner, PiLp.toLp_apply]
+      refine Finset.sum_eq_zero fun k _ ↦ Finset.sum_eq_zero fun l _ ↦ ?_
+      rw [covariance_mul_left, covariance_mul_right, h' i j hij k l, mul_zero, mul_zero]
+    · simp only [EuclideanSpace.basisFun_repr, conj_trivial, Function.comp_apply,
+        EuclideanSpace.basisFun_inner, PiLp.toLp_apply]
+      exact fun _ ↦ HasGaussianLaw.memLp_two.const_mul _
+    · simp only [EuclideanSpace.basisFun_repr, conj_trivial, Function.comp_apply,
+        EuclideanSpace.basisFun_inner, PiLp.toLp_apply]
+      exact fun _ ↦ HasGaussianLaw.memLp_two.const_mul _
+  · fun_prop
+
+open ContinuousLinearMap RealInnerProductSpace in
+lemma HasGaussianLaw.indepFun_of_cov'' {κ : Type*} [Fintype κ]
+    {X : ι → Ω → ℝ} {Y : κ → Ω → ℝ} (h : HasGaussianLaw (fun ω ↦ (fun i ↦ X i ω, fun j ↦ Y j ω)) P)
+    (h' : ∀ i j, cov[X i, Y j; P] = 0) :
+    IndepFun (fun ω i ↦ X i ω) (fun ω j ↦ Y j ω) P := by
+  have := h.isProbabilityMeasure
+  have _ i := h.fst.eval i
+  have _ j := h.snd.eval j
+  have hX : (fun ω i ↦ X i ω) = (ofLp ∘ (toLp 2 ∘ fun ω i ↦ X i ω)) := by
+    ext; simp
+  have hY : (fun ω j ↦ Y j ω) = (ofLp ∘ (toLp 2 ∘ fun ω j ↦ Y j ω)) := by
+    ext; simp
+  rw [hX, hY]
+  apply IndepFun.comp
+  · apply HasGaussianLaw.indepFun_of_cov'
+    · have : (fun ω ↦ ((toLp 2 ∘ fun ω i ↦ X i ω) ω, (toLp 2 ∘ fun ω j ↦ Y j ω) ω)) =
+          ((PiLp.continuousLinearEquiv 2 ℝ (fun _ ↦ ℝ)).symm.toContinuousLinearMap.prodMap
+            (PiLp.continuousLinearEquiv 2 ℝ (fun _ ↦ ℝ)).symm.toContinuousLinearMap) ∘
+            (fun ω ↦ (fun i ↦ X i ω, fun j ↦ Y j ω)) := by
+        ext; all_goals simp
+      rw [this]
+      infer_instance
+    intro x y
+    rw [← (EuclideanSpace.basisFun _ _).sum_repr x, ← (EuclideanSpace.basisFun _ _).sum_repr y]
+    simp_rw [sum_inner, inner_smul_left]
+    rw [covariance_fun_sum_fun_sum]
+    · simp only [EuclideanSpace.basisFun_repr, conj_trivial, Function.comp_apply,
+      EuclideanSpace.basisFun_inner, PiLp.toLp_apply]
+      refine Finset.sum_eq_zero fun k _ ↦ Finset.sum_eq_zero fun l _ ↦ ?_
+      rw [covariance_mul_left, covariance_mul_right, h', mul_zero, mul_zero]
+    · simp only [EuclideanSpace.basisFun_repr, conj_trivial, Function.comp_apply,
+      EuclideanSpace.basisFun_inner, PiLp.toLp_apply]
+      exact fun _ ↦ HasGaussianLaw.memLp_two.const_mul _
+    · simp only [EuclideanSpace.basisFun_repr, conj_trivial, Function.comp_apply,
+        EuclideanSpace.basisFun_inner, PiLp.toLp_apply]
+      exact fun _ ↦ HasGaussianLaw.memLp_two.const_mul _
+  · fun_prop
+  · fun_prop
 
 variable {X Y : Ω → ℝ} {μX μY : ℝ} {vX vY : ℝ≥0}
 

@@ -56,29 +56,6 @@ lemma HasGaussianLaw.charFun_toLp_prodMk {X Y : Ω → ℝ} [hXY : HasGaussianLa
 
 end charFun
 
-lemma HasGaussianLaw.iIndepFun_of_covariance_eq_zero {X : ι → Ω → ℝ}
-    [h1 : HasGaussianLaw (fun ω ↦ (X · ω)) P] (h2 : ∀ i j : ι, i ≠ j → cov[X i, X j; P] = 0) :
-    iIndepFun X P := by
-  have := h1.isProbabilityMeasure
-  refine iIndepFun_iff_charFun_pi h1.aemeasurable.eval |>.2 fun ξ ↦ ?_
-  simp_rw [HasGaussianLaw.charFun_toLp_pi, ← sum_sub_distrib, Complex.exp_sum,
-    HasGaussianLaw.charFun_map_real]
-  congrm ∏ i, Complex.exp (_ - ?_)
-  rw [Fintype.sum_eq_single i]
-  · simp [covariance_self, h1.aemeasurable.eval, pow_two, mul_div_assoc]
-  · exact fun j hj ↦ by simp [h2 i j hj.symm]
-
-lemma HasGaussianLaw.indepFun_of_covariance_eq_zero {X Y : Ω → ℝ}
-    [h1 : HasGaussianLaw (fun ω ↦ (X ω, Y ω)) P] (h2 : cov[X, Y; P] = 0) :
-    IndepFun X Y P := by
-  have := h1.isProbabilityMeasure
-  refine indepFun_iff_charFun_prod h1.aemeasurable.fst h1.aemeasurable.snd |>.2 fun ξ ↦ ?_
-  simp_rw [HasGaussianLaw.charFun_toLp_prodMk, h1.fst.charFun_map_real,
-    h1.snd.charFun_map_real, ← Complex.exp_add, h2, Complex.ofReal_zero, mul_zero,
-    WithLp.ofLp_fst, WithLp.ofLp_snd]
-  congr
-  ring
-
 open ContinuousLinearMap in
 lemma iIndepFun.hasGaussianLaw {E : ι → Type*}
     [∀ i, NormedAddCommGroup (E i)] [∀ i, NormedSpace ℝ (E i)] [∀ i, MeasurableSpace (E i)]
@@ -200,7 +177,7 @@ lemma HasGaussianLaw.indepFun_of_cov' {E F : Type*}
   h.indepFun_of_cov fun _ _ ↦ by simpa [← inner_toDual_symm_eq_self] using h' ..
 
 open ContinuousLinearMap RealInnerProductSpace in
-lemma HasGaussianLaw.iIndepFun_of_cov'' {κ : ι → Type*} [∀ i, Fintype (κ i)] [DecidableEq ι]
+lemma HasGaussianLaw.iIndepFun_of_cov'' {κ : ι → Type*} [∀ i, Fintype (κ i)]
     {X : (i : ι) → κ i → Ω → ℝ} (h : HasGaussianLaw (fun ω i j ↦ X i j ω) P)
     (h' : ∀ i j, i ≠ j → ∀ k l, cov[X i k, X j l; P] = 0) :
     iIndepFun (fun i ω j ↦ X i j ω) P := by
@@ -223,6 +200,23 @@ lemma HasGaussianLaw.iIndepFun_of_cov'' {κ : ι → Type*} [∀ i, Fintype (κ 
   · simp only [EuclideanSpace.basisFun_repr, conj_trivial, Function.comp_apply,
       EuclideanSpace.basisFun_inner, PiLp.toLp_apply]
     exact fun _ ↦ HasGaussianLaw.memLp_two.const_mul _
+
+lemma HasGaussianLaw.iIndepFun_of_covariance_eq_zero {X : ι → Ω → ℝ}
+    [h1 : HasGaussianLaw (fun ω ↦ (X · ω)) P] (h2 : ∀ i j : ι, i ≠ j → cov[X i, X j; P] = 0) :
+    iIndepFun X P := by
+  have : X = fun i ↦ (fun (x : ({i} : Finset ι) → ℝ) ↦ x ⟨i, by simp⟩) ∘ (fun ω j ↦ X i ω) := by
+    ext; simp
+  rw [this]
+  refine iIndepFun.comp (HasGaussianLaw.iIndepFun_of_cov'' ?_ (by simpa)) _ (by fun_prop)
+  let L : (ι → ℝ) →L[ℝ] (i : ι) → ({i} : Finset ι) → ℝ :=
+    { toFun x i _ := x i
+      map_add' x y := by ext; simp
+      map_smul' c x := by ext; simp
+      cont := by fun_prop }
+  have : (fun ω i j ↦ X i ω) = L ∘ (fun ω i ↦ X i ω) := by
+    ext; simp [L]
+  rw [this]
+  infer_instance
 
 open ContinuousLinearMap RealInnerProductSpace in
 lemma HasGaussianLaw.indepFun_of_cov'' {κ : Type*} [Fintype κ]
@@ -258,6 +252,22 @@ lemma HasGaussianLaw.indepFun_of_cov'' {κ : Type*} [Fintype κ]
   · simp only [EuclideanSpace.basisFun_repr, conj_trivial, Function.comp_apply,
       EuclideanSpace.basisFun_inner, PiLp.toLp_apply]
     exact fun _ ↦ HasGaussianLaw.memLp_two.const_mul _
+
+lemma HasGaussianLaw.indepFun_of_covariance_eq_zero {X Y : Ω → ℝ}
+    [h1 : HasGaussianLaw (fun ω ↦ (X ω, Y ω)) P] (h2 : cov[X, Y; P] = 0) :
+    IndepFun X Y P := by
+  have hX : X = (fun x : Unit → ℝ ↦ x ()) ∘ (fun ω _ ↦ X ω) := by ext; simp
+  have hY : Y = (fun x : Unit → ℝ ↦ x ()) ∘ (fun ω _ ↦ Y ω) := by ext; simp
+  rw [hX, hY]
+  refine IndepFun.comp (HasGaussianLaw.indepFun_of_cov'' ?_ (by simpa)) (by fun_prop) (by fun_prop)
+  let L : (ℝ × ℝ) →L[ℝ] (Unit → ℝ) × (Unit → ℝ) :=
+    { toFun p := (fun _ ↦ p.1, fun _ ↦ p.2)
+      map_add' _ _ := by ext <;> simp
+      map_smul' _ _ := by ext <;> simp
+      cont := by fun_prop }
+  have : (fun ω ↦ (fun _ ↦ X ω, fun _ ↦ Y ω)) = L ∘ (fun ω ↦ (X ω, Y ω)) := by ext <;> simp [L]
+  rw [this]
+  infer_instance
 
 variable {X Y : Ω → ℝ} {μX μY : ℝ} {vX vY : ℝ≥0}
 

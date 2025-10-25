@@ -201,22 +201,15 @@ lemma HasGaussianLaw.iIndepFun_of_cov'' {κ : ι → Type*} [∀ i, Fintype (κ 
       EuclideanSpace.basisFun_inner, PiLp.toLp_apply]
     exact fun _ ↦ HasGaussianLaw.memLp_two.const_mul _
 
+open RealInnerProductSpace in
 lemma HasGaussianLaw.iIndepFun_of_covariance_eq_zero {X : ι → Ω → ℝ}
     [h1 : HasGaussianLaw (fun ω ↦ (X · ω)) P] (h2 : ∀ i j : ι, i ≠ j → cov[X i, X j; P] = 0) :
     iIndepFun X P := by
-  have : X = fun i ↦ (fun (x : ({i} : Finset ι) → ℝ) ↦ x ⟨i, by simp⟩) ∘ (fun ω j ↦ X i ω) := by
-    ext; simp
-  rw [this]
-  refine iIndepFun.comp (HasGaussianLaw.iIndepFun_of_cov'' ?_ (by simpa)) _ (by fun_prop)
-  let L : (ι → ℝ) →L[ℝ] (i : ι) → ({i} : Finset ι) → ℝ :=
-    { toFun x i _ := x i
-      map_add' x y := by ext; simp
-      map_smul' c x := by ext; simp
-      cont := by fun_prop }
-  have : (fun ω i j ↦ X i ω) = L ∘ (fun ω i ↦ X i ω) := by
-    ext; simp [L]
-  rw [this]
-  infer_instance
+  refine h1.iIndepFun_of_cov fun i j hij L₁ L₂ ↦ ?_
+  -- change cov[fun ω ↦ L₁ (X i ω), fun ω ↦ L₂ (X j ω); P] = 0
+  simp [← inner_toDual_symm_eq_self, Function.comp_def,
+    mul_comm _ ((InnerProductSpace.toDual ℝ ℝ).symm _),
+    covariance_mul_right, covariance_mul_left, h2, hij]
 
 open ContinuousLinearMap RealInnerProductSpace in
 lemma HasGaussianLaw.indepFun_of_cov'' {κ : Type*} [Fintype κ]
@@ -256,18 +249,10 @@ lemma HasGaussianLaw.indepFun_of_cov'' {κ : Type*} [Fintype κ]
 lemma HasGaussianLaw.indepFun_of_covariance_eq_zero {X Y : Ω → ℝ}
     [h1 : HasGaussianLaw (fun ω ↦ (X ω, Y ω)) P] (h2 : cov[X, Y; P] = 0) :
     IndepFun X Y P := by
-  have hX : X = (fun x : Unit → ℝ ↦ x ()) ∘ (fun ω _ ↦ X ω) := by ext; simp
-  have hY : Y = (fun x : Unit → ℝ ↦ x ()) ∘ (fun ω _ ↦ Y ω) := by ext; simp
-  rw [hX, hY]
-  refine IndepFun.comp (HasGaussianLaw.indepFun_of_cov'' ?_ (by simpa)) (by fun_prop) (by fun_prop)
-  let L : (ℝ × ℝ) →L[ℝ] (Unit → ℝ) × (Unit → ℝ) :=
-    { toFun p := (fun _ ↦ p.1, fun _ ↦ p.2)
-      map_add' _ _ := by ext <;> simp
-      map_smul' _ _ := by ext <;> simp
-      cont := by fun_prop }
-  have : (fun ω ↦ (fun _ ↦ X ω, fun _ ↦ Y ω)) = L ∘ (fun ω ↦ (X ω, Y ω)) := by ext <;> simp [L]
-  rw [this]
-  infer_instance
+  refine h1.indepFun_of_cov fun L₁ L₂ ↦ ?_
+  simp [← inner_toDual_symm_eq_self, Function.comp_def,
+    mul_comm _ ((InnerProductSpace.toDual ℝ ℝ).symm _),
+    covariance_mul_right, covariance_mul_left, h2]
 
 variable {X Y : Ω → ℝ} {μX μY : ℝ} {vX vY : ℝ≥0}
 

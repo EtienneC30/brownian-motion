@@ -437,22 +437,19 @@ lemma IsPreBrownian.shift [h : IsPreBrownian X P] (t₀ : ℝ≥0) :
 lemma IsPreBrownian.indepFun_shift [h : IsPreBrownian X P] (hX : ∀ t, Measurable (X t)) (t₀ : ℝ≥0) :
     IndepFun (fun ω t ↦ X (t₀ + t) ω - X t₀ ω) (fun ω (t : Set.Iic t₀) ↦ X t ω) P := by
   apply IsGaussianProcess.indepFun''
-  · apply h.isGaussianProcess.obv
+  · apply h.isGaussianProcess.of_isGaussianProcess
     rintro (t | ⟨t, ht⟩)
     · let L : (({t₀, t₀ + t} : Finset ℝ≥0) → ℝ) →L[ℝ] ℝ :=
         { toFun x := x ⟨t₀ + t, by simp⟩ - x ⟨t₀, by simp⟩
           map_add' x y := by simp; abel
           map_smul' c x := by simp; ring }
-      refine ⟨_, L, fun ω ↦ ?_⟩
-      simp [L]
+      exact ⟨_, L, fun ω ↦ by simp [L]⟩
     · let L : (({t} : Finset ℝ≥0) → ℝ) →L[ℝ] ℝ :=
         { toFun x := x ⟨t, by simp⟩
           map_add' x y := by simp
           map_smul' c x := by simp }
-      refine ⟨_, L, fun ω ↦ ?_⟩
-      simp [L]
-  · fun_prop
-  · fun_prop
+      exact ⟨_, L, fun ω ↦ by simp [L]⟩
+  any_goals fun_prop
   · rintro s ⟨t, ht : t ≤ t₀⟩
     have := h.isGaussianProcess.isProbabilityMeasure
     rw [covariance_fun_sub_left, h.covariance_eval, h.covariance_eval, min_eq_right, min_eq_right,

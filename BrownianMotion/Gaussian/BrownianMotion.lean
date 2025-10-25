@@ -438,7 +438,7 @@ lemma IsPreBrownian.indepFun_shift [h : IsPreBrownian X P] (hX : ∀ t, Measurab
     IndepFun (fun ω t ↦ X (t₀ + t) ω - X t₀ ω) (fun ω (t : Set.Iic t₀) ↦ X t ω) P := by
   apply IsGaussianProcess.indepFun''
   · apply h.isGaussianProcess.obv
-    rintro (t | ⟨t, ht : t ≤ t₀⟩)
+    rintro (t | ⟨t, ht⟩)
     · let L : (({t₀, t₀ + t} : Finset ℝ≥0) → ℝ) →L[ℝ] ℝ :=
         { toFun x := x ⟨t₀ + t, by simp⟩ - x ⟨t₀, by simp⟩
           map_add' x y := by simp; abel

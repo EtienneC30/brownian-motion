@@ -8,6 +8,7 @@ import BrownianMotion.Continuity.KolmogorovChentsov
 import BrownianMotion.Gaussian.GaussianProcess
 import BrownianMotion.Gaussian.Moment
 import BrownianMotion.Gaussian.ProjectiveLimit
+import Mathlib.Probability.Process.Filtration
 import Mathlib.Topology.ContinuousMap.SecondCountableSpace
 
 /-!
@@ -554,6 +555,11 @@ lemma IsBrownian.tendsto_div_id_atTop [h : IsBrownian X P] :
   have : (fun t ↦ (X t ω) / t) = (fun t ↦ t * (X (1 / t) ω)) ∘ (fun t ↦ t⁻¹) := by ext; simp [field]
   rw [this]
   exact hω.comp tendsto_inv_atTop_zero
+
+lemma IsBrownian.indep_zero [h : IsBrownian X P] (hX : ∀ t, Measurable (X t)) :
+    ∀ A, MeasurableSet[⨅ s > 0, Filtration.natural X (fun t ↦ (hX t).stronglyMeasurable) s] A →
+    P A = 0 ∨ P A = 1 := by
+  sorry
 
 end IsBrownian
 

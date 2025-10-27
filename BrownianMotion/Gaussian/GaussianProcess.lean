@@ -5,6 +5,7 @@ Authors: Rémy Degenne
 -/
 import BrownianMotion.Auxiliary.HasGaussianLaw
 import BrownianMotion.Gaussian.StochasticProcesses
+import Mathlib.Probability.Independence.Process
 import Mathlib.Probability.Process.FiniteDimensionalLaws
 
 /-!
@@ -118,7 +119,7 @@ lemma IsGaussianProcess.indepFun [CompleteSpace E] {X : S → Ω → E} {Y : T �
   have := h.isProbabilityMeasure
   have _ s : HasGaussianLaw (X s) P := h.hasGaussianLaw_eval (.inl s)
   have _ t : HasGaussianLaw (Y t) P := h.hasGaussianLaw_eval (.inr t)
-  refine IndepFun.indepFun_processes hX hY fun I J ↦
+  refine IndepFun.indepFun_process hX hY fun I J ↦
     HasGaussianLaw.indepFun_of_cov ?_ fun L₁ L₂ ↦ ?_
   · let L : (I.disjSum J → E) →L[ℝ] (I → E) × (J → E) :=
       { toFun x := (fun s ↦ x ⟨Sum.inl s, Finset.inl_mem_disjSum.2 s.2⟩,
@@ -150,7 +151,7 @@ lemma IsGaussianProcess.iIndepFun [CompleteSpace E] {S : T → Type*}
     iIndepFun (fun t ω s ↦ X t s ω) P := by
   have := h.isProbabilityMeasure
   have _ t s : HasGaussianLaw (X t s) P := h.hasGaussianLaw_eval ⟨t, s⟩
-  refine iIndepFun.iIndepFun_processes hX fun I J ↦
+  refine iIndepFun.iIndepFun_process hX fun I J ↦
     HasGaussianLaw.iIndepFun_of_cov ?_ fun i j hij L₁ L₂ ↦ ?_
   · classical
     let L : (I.sigma (fun i ↦ if hi : i ∈ I then J ⟨i, hi⟩ else ∅) → E) →L[ℝ] (i : I) → J i → E :=
@@ -214,13 +215,36 @@ lemma IsGaussianProcess.iIndepFun'' {S : T → Type*}
   h.iIndepFun' hX fun _ _ h'' _ _ _ _ ↦ by
     simp [mul_comm, covariance_mul_left, covariance_mul_right, h' _ _ h'']
 
-/-- If a stochastic process `Y` is such that for `s`, `Y s` can be written as a linear
-combination of finitely many values of a Gaussian process, then `Y` is a Gaussian process. -/
-lemma IsGaussianProcess.of_isGaussianProcess [IsGaussianProcess X P]
-    {F : Type*} [NormedAddCommGroup F] [NormedSpace ℝ F] [MeasurableSpace F]
-    [BorelSpace F] [SecondCountableTopology F] {Y : S → Ω → F}
-    (h : ∀ s, ∃ I : Finset T, ∃ L : (I → E) →L[ℝ] F, ∀ ω, Y s ω = L (I.restrict (X · ω))) :
-    IsGaussianProcess Y P where
+lemma IsGaussianProcess.comp_right [IsGaussianProcess X P]
+    (f : S → T) : IsGaussianProcess (X ∘ f) P where
+  hasGaussianLaw I := by
+    classical
+    let L : ((I.image f) → E) →L[ℝ] (I → E) :=
+      { toFun x s := x ⟨f s, Finset.mem_image.2 ⟨s.1, s.2, rfl⟩⟩
+        map_add' x y := by ext; simp
+        map_smul' c x := by ext; simp
+        cont := by fun_prop }
+    have : (fun ω (i : I) (j : J i) ↦ X i j ω) =
+        L ∘ (fun ω ↦ (I.sigma (fun i ↦ if hi : i ∈ I then J ⟨i, hi⟩ else ∅)).restrict
+          (fun p ↦ X p.1 p.2 ω)) := by
+      ext; simp [L]
+    rw [this]
+    infer_instance
+  classical
+  have h1 : L₁ ∘ (fun ω k ↦ X i k ω) = ∑ k : J i, (L₁ ∘L .single ℝ _ k) ∘ X i k := by
+    ext ω
+    simp only [Function.comp_apply, ← L₁.sum_comp_single, Finset.univ_eq_attach, Finset.sum_apply]
+  have h2 : L₂ ∘ (fun ω k ↦ X j k ω) = ∑ k : J j, (L₂ ∘L .single ℝ _ k) ∘ X j k := by
+    ext ω
+    simp only [Function.comp_apply, ← L₂.sum_comp_single, Finset.univ_eq_attach, Finset.sum_apply]
+  rw [h1, h2, covariance_sum_sum]
+  · exact Finset.sum_eq_zero fun _ _ ↦ Finset.sum_eq_zero fun _ _ ↦ h' i j (by simpa) ..
+  all_goals exact fun _ ↦ HasGaussianLaw.memLp_two
+
+lemma IsGaussianProcess.comp_left {F : Type*}
+    [NormedAddCommGroup F] [NormedSpace ℝ F] [MeasurableSpace F] [BorelSpace F]
+    [SecondCountableTopology F] (L : T → E →L[ℝ] F) [IsGaussianProcess X P] :
+    IsGaussianProcess (fun t ω ↦ L t (X t ω)) P where
   hasGaussianLaw I := by
     choose J L hL using h
     classical

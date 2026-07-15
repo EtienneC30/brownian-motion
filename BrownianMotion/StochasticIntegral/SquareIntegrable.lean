@@ -35,7 +35,10 @@ lemma IsSquareIntegrable.const_fun [OrderBot ι] {ξ : Ω → E} (mξ : Strongly
     [SigmaFiniteFiltration P 𝓕] (hξ1 : Integrable ξ P) (hξ2 : MemLp ξ 2 P) :
     IsSquareIntegrable (fun _ ↦ ξ) 𝓕 P where
   martingale := martingale_const_fun 𝓕 P mξ hξ1
-  cadlag ω := isCadlag_const
+  cadlag ω := isCadlag_const _
+  bounded := by
+    rw [iSup_const]
+    exact hξ2.2
 
 /-- A stochastic process is locally square-integrable if it satisfies the square-integrable
 martingale property locally. -/
@@ -59,9 +62,10 @@ lemma IsSquareIntegrable.integrable_sq (hX : IsSquareIntegrable X 𝓕 P) (i : �
       _ < ∞ := hX.bounded
     simpa [HasFiniteIntegral, eLpNorm_lt_top_iff_lintegral_rpow_enorm_lt_top] using hX_bound
 
+@[to_fun]
 lemma IsSquareIntegrable.add [CompleteSpace E] (hX : IsSquareIntegrable X 𝓕 P)
     (hY : IsSquareIntegrable Y 𝓕 P) :
-    IsSquareIntegrable (fun i ω ↦ X i ω + Y i ω) 𝓕 P := by
+    IsSquareIntegrable (X + Y) 𝓕 P := by
   refine ⟨hX.martingale.add hY.martingale, fun ω ↦ (hX.2 ω).add (hY.2 ω), ?_⟩
   have hX_bound : ⨆ i, eLpNorm (X i) 2 P < ∞ := hX.bounded
   have hY_bound : ⨆ i, eLpNorm (Y i) 2 P < ∞ := hY.bounded
@@ -78,8 +82,9 @@ lemma IsSquareIntegrable.add [CompleteSpace E] (hX : IsSquareIntegrable X 𝓕 P
         · exact le_iSup (fun i => eLpNorm (Y i) 2 P) i
     _ < ∞ := ENNReal.add_lt_top.mpr ⟨hX_bound, hY_bound⟩
 
+@[to_fun]
 lemma IsSquareIntegrable.smul [CompleteSpace E] (hX : IsSquareIntegrable X 𝓕 P) (r : ℝ) :
-    IsSquareIntegrable (fun i ω ↦ r • X i ω) 𝓕 P where
+    IsSquareIntegrable (r • X) 𝓕 P where
   martingale := hX.martingale.smul r
   cadlag ω := by
     simpa [Pi.smul_apply] using (hX.cadlag ω).fun_const_smul r
@@ -87,6 +92,28 @@ lemma IsSquareIntegrable.smul [CompleteSpace E] (hX : IsSquareIntegrable X 𝓕 
     change (⨆ i, eLpNorm (r • X i) 2 P) < ∞
     simp only [eLpNorm_const_smul, ← ENNReal.mul_iSup]
     exact ENNReal.mul_lt_top ENNReal.coe_lt_top hX.bounded
+
+@[to_fun]
+lemma IsSquareIntegrable.neg [CompleteSpace E] (hX : IsSquareIntegrable X 𝓕 P) :
+    IsSquareIntegrable (-X) 𝓕 P := by
+  simpa using hX.smul (-1)
+
+@[to_fun]
+lemma IsSquareIntegrable.sub [CompleteSpace E] (hX : IsSquareIntegrable X 𝓕 P)
+    (hY : IsSquareIntegrable Y 𝓕 P) :
+    IsSquareIntegrable (X - Y) 𝓕 P := by
+  simpa [sub_eq_add_neg] using (hX.add hY.neg)
+
+lemma IsSquareIntegrable.sub_bot [SigmaFiniteFiltration P 𝓕] [CompleteSpace E] [OrderBot ι]
+    {X : ι → Ω → E}
+    (hX : IsSquareIntegrable X 𝓕 P) :
+    IsSquareIntegrable (X · - X ⊥) 𝓕 P := by
+  apply hX.sub
+  apply IsSquareIntegrable.const_fun
+  · exact hX.martingale.stronglyMeasurable ⊥
+  · exact hX.martingale.integrable ⊥
+  · exact ⟨(hX.martingale.stronglyMeasurable ⊥).mono (𝓕.le' ⊥) |>.aestronglyMeasurable,
+      (le_iSup (fun i ↦ eLpNorm (X i) 2 P) ⊥).trans_lt hX.bounded⟩
 
 variable [SigmaFiniteFiltration P 𝓕]
 
@@ -174,41 +201,77 @@ lemma SquareIntegrable.coe_smul (X : SquareIntegrable ι E P 𝓕) (c : ℝ) :
 instance : CompleteSpace (SquareIntegrable ι E P 𝓕) := by
   sorry
 
+variable [CompleteSpace E]
+
 variable (ι E P 𝓕) in
 /-- The set of continuous square integrable martingales, as a submodule of the type of
 square-integrable martingales, see `SquareIntegrable`. -/
-def ContinuousSquareIntegrable : Submodule ℝ (SquareIntegrable ι E P 𝓕) where
-  carrier := {X | ∃ Y : ι → Ω → E, (∀ ω, Continuous (Y · ω)) ∧ (fun ω t ↦ Y t ω) =ᵐ[P] X.1}
+def continuousSquareIntegrable : Submodule ℝ (SquareIntegrable ι E P 𝓕) where
+  carrier := {X | ∃ Y : ι → Ω → E, (∀ ω, Continuous (Y · ω)) ∧ IsSquareIntegrable Y 𝓕 P ∧
+      (fun ω t ↦ Y t ω) =ᵐ[P] X.1}
   add_mem' := by
-    rintro X Y ⟨X', hX1, hX2⟩ ⟨Y', hY1, hY2⟩
-    refine ⟨X' + Y', fun ω ↦ (hX1 ω).add (hY1 ω), ?_⟩
-    grw [SquareIntegrable.coe_add, AEEqFun.coeFn_add, ← hX2, ← hY2]
+    rintro X Y ⟨X', hX1, hX2, hX3⟩ ⟨Y', hY1, hY2, hY3⟩
+    refine ⟨X' + Y', fun ω ↦ (hX1 ω).add (hY1 ω), hX2.add hY2, ?_⟩
+    grw [SquareIntegrable.coe_add, AEEqFun.coeFn_add, ← hX3, ← hY3]
     rfl
   zero_mem' := by
-    refine ⟨0, by fun_prop, ?_⟩
+    refine ⟨0, by fun_prop, sorry, ?_⟩
     grw [SquareIntegrable.coe_zero, AEEqFun.coeFn_zero]
     rfl
   smul_mem' := by
-    rintro c X ⟨X', hX1, hX2⟩
-    refine ⟨c • X', fun ω ↦ (hX1 ω).const_smul c, ?_⟩
-    grw [SquareIntegrable.coe_smul, AEEqFun.coeFn_smul, ← hX2]
+    rintro c X ⟨X', hX1, hX2, hX3⟩
+    refine ⟨c • X', fun ω ↦ (hX1 ω).const_smul c, hX2.smul c, ?_⟩
+    grw [SquareIntegrable.coe_smul, AEEqFun.coeFn_smul, ← hX3]
     rfl
 
-instance : IsClosed (ContinuousSquareIntegrable ι E P 𝓕 : Set (SquareIntegrable ι E P 𝓕)) := by
+noncomputable def continuousSquareIntegrable.out (X : continuousSquareIntegrable ι E P 𝓕) :
+    ι → Ω → E :=
+  X.2.choose
+
+lemma continuous_out (X : continuousSquareIntegrable ι E P 𝓕) (ω : Ω) :
+    Continuous (continuousSquareIntegrable.out X · ω) :=
+  X.2.choose_spec.1 ω
+
+lemma isSquareIntegrable_out (X : continuousSquareIntegrable ι E P 𝓕) :
+    IsSquareIntegrable (continuousSquareIntegrable.out X) 𝓕 P :=
+  X.2.choose_spec.2.1
+
+lemma out_ae_eq (X : continuousSquareIntegrable ι E P 𝓕) :
+    (fun ω t ↦ continuousSquareIntegrable.out X t ω) =ᵐ[P] X.1.1 :=
+  X.2.choose_spec.2.2
+
+instance : IsClosed (continuousSquareIntegrable ι E P 𝓕 : Set (SquareIntegrable ι E P 𝓕)) := by
   sorry
 
+variable (P 𝓕) in
 open scoped Classical in
-/-- The continuous martingale part of a square-integrable martingale.
+/-- The continuous martingale part of a square-integrable martingale `X`. This is defined as the
+projection of `X` onto the closed subspace of continuous square-integrable martingales.
 
 TODO: we rely on the already existing `AEEqFun` machinery, but this is about equivalence classes
 of strongly measurable functions, while here we are interested in undistinguishability only
 so measurablility is the way to go. It seems we will need to duplicate `AEEqFun` for the measurable
 case. -/
-noncomputable def continuousPart [Bot ι] (X : ι → Ω → E) : ι → Ω → E :=
+noncomputable def continuousPart [OrderBot ι] (X : ι → Ω → E) : ι → Ω → E :=
   if hX : IsSquareIntegrable X 𝓕 P
-    then fun t ω ↦ ((ContinuousSquareIntegrable ι E P 𝓕).orthogonalProjectionOnto
-      ⟨.mk (fun ω t ↦ X t ω) sorry, ⟨(X · - X ⊥), hX.sub, (AEEqFun.coeFn_mk _ _).symm⟩⟩).1.1 ω t - X ⊥ ω
+    then fun t ω ↦ continuousSquareIntegrable.out
+      ((continuousSquareIntegrable ι E P 𝓕).orthogonalProjectionOnto
+      ⟨.mk (fun ω t ↦ X t ω - X ⊥ ω) sorry,
+        ⟨(X · - X ⊥), hX.sub_bot, (AEEqFun.coeFn_mk _ _).symm⟩⟩) t ω - X ⊥ ω
     else 0
+
+variable (P 𝓕) in
+noncomputable def discontinuousPart [OrderBot ι] (X : ι → Ω → E) : ι → Ω → E :=
+  fun t ω ↦ X t ω - X ⊥ ω - (continuousPart P 𝓕 X t ω)
+
+variable (ι E P 𝓕) in
+noncomputable def discontinuousSquareIntegrable : Submodule ℝ (SquareIntegrable ι E P 𝓕) :=
+  (continuousSquareIntegrable ι E P 𝓕).orthogonal
+
+variable (P 𝓕) in
+def IsPurelyDiscontinuous (X : ι → Ω → E) : Prop :=
+  IsSquareIntegrable X 𝓕 P ∧
+    ∃ Y ∈ discontinuousSquareIntegrable ι E P 𝓕, (fun ω t ↦ X t ω) =ᵐ[P] Y.1
 
 end Hilbert
 

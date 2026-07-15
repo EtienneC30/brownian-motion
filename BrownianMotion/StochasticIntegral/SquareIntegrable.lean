@@ -31,6 +31,12 @@ structure IsSquareIntegrable (X : ι → Ω → E) (𝓕 : Filtration ι mΩ) (P
   cadlag : ∀ ω, IsCadlag (X · ω)
   bounded : ⨆ i, eLpNorm (X i) 2 P < ∞
 
+lemma IsSquareIntegrable.const_fun [OrderBot ι] {ξ : Ω → E} (mξ : StronglyMeasurable[𝓕 ⊥] ξ)
+    [SigmaFiniteFiltration P 𝓕] (hξ1 : Integrable ξ P) (hξ2 : MemLp ξ 2 P) :
+    IsSquareIntegrable (fun _ ↦ ξ) 𝓕 P where
+  martingale := martingale_const_fun 𝓕 P mξ hξ1
+  cadlag ω := isCadlag_const
+
 /-- A stochastic process is locally square-integrable if it satisfies the square-integrable
 martingale property locally. -/
 def IsLocallySquareIntegrable [OrderBot ι] [OrderTopology ι]
@@ -137,5 +143,73 @@ lemma IsSquareIntegrable.ae_tendsto_limitProcess (hX : IsSquareIntegrable X 𝓕
 lemma IsSquareIntegrable.tendsto_eLpNorm_two_limitProcess (hX : IsSquareIntegrable X 𝓕 P) :
     Tendsto (fun i ↦ eLpNorm (X i - 𝓕.limitProcess X P) 2 P) atTop (𝓝 0) := by
   sorry
+
+lemma IsSquareIntegrable.iSup_eLpNorm_eq_eLpNorm_limitProcess (hX : IsSquareIntegrable X 𝓕 P) :
+    ⨆ i, eLpNorm (X i) 2 P = eLpNorm (𝓕.limitProcess X P) 2 P := by
+  sorry
+
+section Hilbert
+
+variable (ι E P 𝓕) in
+/-- The type of square integrable martingales. -/
+def SquareIntegrable : Type _ :=
+  {X : Ω →ₘ[P] (ι → E) // ∃ Y : ι → Ω → E, IsSquareIntegrable Y 𝓕 P ∧ (fun ω t ↦ Y t ω) =ᵐ[P] X}
+
+instance : NormedAddCommGroup (SquareIntegrable ι E P 𝓕) := sorry
+
+instance : InnerProductSpace ℝ (SquareIntegrable ι E P 𝓕) := sorry
+
+lemma SquareIntegrable.coe_add (X Y : SquareIntegrable ι E P 𝓕) :
+    (X + Y).1 = X.1 + Y.1 := by
+  sorry
+
+@[simp]
+lemma SquareIntegrable.coe_zero : (0 : SquareIntegrable ι E P 𝓕).1 = 0 := by
+  sorry
+
+lemma SquareIntegrable.coe_smul (X : SquareIntegrable ι E P 𝓕) (c : ℝ) :
+    (c • X).1 = c • X.1 := by
+  sorry
+
+instance : CompleteSpace (SquareIntegrable ι E P 𝓕) := by
+  sorry
+
+variable (ι E P 𝓕) in
+/-- The set of continuous square integrable martingales, as a submodule of the type of
+square-integrable martingales, see `SquareIntegrable`. -/
+def ContinuousSquareIntegrable : Submodule ℝ (SquareIntegrable ι E P 𝓕) where
+  carrier := {X | ∃ Y : ι → Ω → E, (∀ ω, Continuous (Y · ω)) ∧ (fun ω t ↦ Y t ω) =ᵐ[P] X.1}
+  add_mem' := by
+    rintro X Y ⟨X', hX1, hX2⟩ ⟨Y', hY1, hY2⟩
+    refine ⟨X' + Y', fun ω ↦ (hX1 ω).add (hY1 ω), ?_⟩
+    grw [SquareIntegrable.coe_add, AEEqFun.coeFn_add, ← hX2, ← hY2]
+    rfl
+  zero_mem' := by
+    refine ⟨0, by fun_prop, ?_⟩
+    grw [SquareIntegrable.coe_zero, AEEqFun.coeFn_zero]
+    rfl
+  smul_mem' := by
+    rintro c X ⟨X', hX1, hX2⟩
+    refine ⟨c • X', fun ω ↦ (hX1 ω).const_smul c, ?_⟩
+    grw [SquareIntegrable.coe_smul, AEEqFun.coeFn_smul, ← hX2]
+    rfl
+
+instance : IsClosed (ContinuousSquareIntegrable ι E P 𝓕 : Set (SquareIntegrable ι E P 𝓕)) := by
+  sorry
+
+open scoped Classical in
+/-- The continuous martingale part of a square-integrable martingale.
+
+TODO: we rely on the already existing `AEEqFun` machinery, but this is about equivalence classes
+of strongly measurable functions, while here we are interested in undistinguishability only
+so measurablility is the way to go. It seems we will need to duplicate `AEEqFun` for the measurable
+case. -/
+noncomputable def continuousPart [Bot ι] (X : ι → Ω → E) : ι → Ω → E :=
+  if hX : IsSquareIntegrable X 𝓕 P
+    then fun t ω ↦ ((ContinuousSquareIntegrable ι E P 𝓕).orthogonalProjectionOnto
+      ⟨.mk (fun ω t ↦ X t ω) sorry, ⟨(X · - X ⊥), hX.sub, (AEEqFun.coeFn_mk _ _).symm⟩⟩).1.1 ω t - X ⊥ ω
+    else 0
+
+end Hilbert
 
 end ProbabilityTheory

@@ -9,6 +9,10 @@ public import BrownianMotion.Auxiliary.Martingale
 public import BrownianMotion.StochasticIntegral.LocalMartingale
 public import Mathlib.Probability.Notation
 
+import BrownianMotion.Gaussian.StochasticProcesses
+import Mathlib.MeasureTheory.Function.LpSeminorm.LpNorm
+import Mathlib.MeasureTheory.Function.Holder
+
 /-! # Square integrable martingales
 
 -/
@@ -33,7 +37,7 @@ variable [NormedSpace ℝ E]
 second moments. -/
 structure IsSquareIntegrable (X : ι → Ω → E) (𝓕 : Filtration ι mΩ) (P : Measure Ω) : Prop where
   martingale : Martingale X 𝓕 P
-  cadlag : ∀ᵐ ω ∂P, IsCadlag (X · ω)
+  cadlag : ∀ ω, IsCadlag (X · ω)
   bounded : ⨆ i, eLpNorm (X i) 2 P < ∞
 
 def IsAESquareIntegrable (X : ι → Ω → E) (𝓕 : Filtration ι mΩ) (P : Measure Ω) : Prop :=
@@ -58,7 +62,7 @@ lemma IsSquareIntegrable.const_fun [OrderBot ι] {ξ : Ω → E} (mξ : Strongly
     [SigmaFiniteFiltration P 𝓕] (hξ1 : Integrable ξ P) (hξ2 : MemLp ξ 2 P) :
     IsSquareIntegrable (fun _ ↦ ξ) 𝓕 P where
   martingale := martingale_const_fun 𝓕 P mξ hξ1
-  cadlag := ae_of_all _ fun _ ↦ isCadlag_const _
+  cadlag := fun _ ↦ isCadlag_const _
   bounded := by
     rw [iSup_const]
     exact hξ2.2
@@ -73,6 +77,12 @@ lemma IsSquareIntegrable.isLocallySquareIntegrable [OrderBot ι] [OrderTopology 
     (hX : IsSquareIntegrable X 𝓕 P) :
     IsLocallySquareIntegrable X 𝓕 P :=
   Locally.of_prop hX
+
+lemma IsSquareIntegrable.memLp_two (hX : IsSquareIntegrable X 𝓕 P) (i : ι) :
+    MemLp (X i) 2 P := by
+  refine ⟨(hX.martingale.stronglyMeasurable i).aestronglyMeasurable.mono (𝓕.le i), ?_⟩
+  grw [le_iSup (fun t ↦ eLpNorm (X t) 2 P)]
+  exact hX.bounded
 
 lemma IsSquareIntegrable.integrable_sq (hX : IsSquareIntegrable X 𝓕 P) (i : ι) :
     Integrable (fun ω ↦ ‖X i ω‖ ^ 2) P := by
@@ -89,8 +99,7 @@ lemma IsSquareIntegrable.integrable_sq (hX : IsSquareIntegrable X 𝓕 P) (i : �
 lemma IsSquareIntegrable.add [CompleteSpace E] (hX : IsSquareIntegrable X 𝓕 P)
     (hY : IsSquareIntegrable Y 𝓕 P) :
     IsSquareIntegrable (X + Y) 𝓕 P := by
-  refine ⟨hX.martingale.add hY.martingale, ?_, ?_⟩
-  · filter_upwards [hX.cadlag, hY.cadlag] with ω hX hY using hX.add hY
+  refine ⟨hX.martingale.add hY.martingale, fun ω ↦ (hX.cadlag ω).add (hY.cadlag ω), ?_⟩
   have hX_bound : ⨆ i, eLpNorm (X i) 2 P < ∞ := hX.bounded
   have hY_bound : ⨆ i, eLpNorm (Y i) 2 P < ∞ := hY.bounded
   calc ⨆ i, eLpNorm (fun ω ↦ X i ω + Y i ω) 2 P
@@ -110,8 +119,7 @@ lemma IsSquareIntegrable.add [CompleteSpace E] (hX : IsSquareIntegrable X 𝓕 P
 lemma IsSquareIntegrable.smul [CompleteSpace E] (hX : IsSquareIntegrable X 𝓕 P) (r : ℝ) :
     IsSquareIntegrable (r • X) 𝓕 P where
   martingale := hX.martingale.smul r
-  cadlag := by
-    filter_upwards [hX.cadlag] with ω h using h.const_smul r
+  cadlag ω := hX.cadlag ω |>.const_smul r
   bounded := by
     change (⨆ i, eLpNorm (r • X i) 2 P) < ∞
     simp only [eLpNorm_const_smul, ← ENNReal.mul_iSup]
@@ -161,13 +169,13 @@ lemma IsLocallySquareIntegrable.isLocalSubmartingale_sq_norm
     by_cases hτ : ⊥ < τ ω <;> simp [stoppedProcess, hτ]
   unfold IsLocalSubmartingale
   change Locally (fun Y : ι → Ω → ℝ ↦ Submartingale Y 𝓕 P ∧
-      ∀ᵐ ω ∂P, IsCadlag (Y · ω)) 𝓕 (fun t ω ↦ ‖X t ω‖ ^ 2) P
+      ∀ ω, IsCadlag (Y · ω)) 𝓕 (fun t ω ↦ ‖X t ω‖ ^ 2) P
   refine ⟨hX.localSeq, hX.isLocalizingSequence_localSeq, fun n ↦ ?_⟩
   have hXn := hX.stoppedProcess_localSeq n
   constructor
   · simpa [h_stopped_sq_norm] using hXn.submartingale_sq_norm
-  · filter_upwards [hXn.cadlag] with ω hXn
-    simpa [h_stopped_sq_norm] using hXn.norm_sq
+  · intro ω
+    simpa [h_stopped_sq_norm] using IsCadlag.norm_sq (hXn.cadlag ω)
 
 lemma IsSquareIntegrable.eLpNorm_mono [CompleteSpace E] (hX : IsSquareIntegrable X 𝓕 P)
     {i j : ι} (hij : i ≤ j) :
@@ -199,7 +207,52 @@ lemma IsSquareIntegrable.iSup_eLpNorm_eq_eLpNorm_limitProcess (hX : IsSquareInte
     ⨆ i, eLpNorm (X i) 2 P = eLpNorm (𝓕.limitProcess X P) 2 P := by
   sorry
 
+lemma IsSquareIntegrable.iSup_lpNorm_eq_lpNorm_limitProcess (hX : IsSquareIntegrable X 𝓕 P) :
+    ⨆ i, lpNorm (X i) 2 P = lpNorm (𝓕.limitProcess X P) 2 P := by
+  sorry
+
+lemma IsSquareIntegrable.memLp_limitProcess (hX : IsSquareIntegrable X 𝓕 P) :
+    MemLp (𝓕.limitProcess X P) 2 P := by
+  constructor
+  · exact Filtration.stronglyMeasurable_limit_process'.aestronglyMeasurable
+  grw [← hX.iSup_eLpNorm_eq_eLpNorm_limitProcess]
+  exact hX.bounded
+
 end NormedSpace
+
+def Undistinguishable {ι Ω E : Type*} {mΩ : MeasurableSpace Ω} (P : Measure Ω) (X Y : ι → Ω → E) :
+    Prop := ∀ᵐ ω ∂P, ∀ t, X t ω = Y t ω
+
+notation3:50 X " ≡ᵐ[" P:50 "] " Y:50 => Undistinguishable P X Y
+
+namespace Undistinguishable
+
+variable {ι Ω E : Type*} {mΩ : MeasurableSpace Ω} {P : Measure Ω} {X Y Z : ι → Ω → E}
+
+@[refl, simp]
+protected lemma refl (P : Measure Ω) (X : ι → Ω → E) : X ≡ᵐ[P] X :=
+  .of_forall fun _ _ ↦ rfl
+
+protected lemma rfl : X ≡ᵐ[P] X := by rfl
+
+@[symm]
+protected lemma symm (h : X ≡ᵐ[P] Y) : Y ≡ᵐ[P] X := by
+  filter_upwards [h] with ω h t using (h t).symm
+
+@[trans]
+protected lemma trans (h1 : X ≡ᵐ[P] Y) (h2 : Y ≡ᵐ[P] Z) : X ≡ᵐ[P] Z := by
+  filter_upwards [h1, h2] with ω h t
+  grind
+
+protected lemma fun_comp {F : Type*} (h : X ≡ᵐ[P] Y) (f : E → F) :
+    (fun t ω ↦ f (X t ω)) ≡ᵐ[P] (fun t ω ↦ f (Y t ω)) := by
+  filter_upwards [h] with ω h t
+  rw [h]
+
+protected lemma neg [Neg E] (h : X ≡ᵐ[P] Y) :
+    -X ≡ᵐ[P] -Y := h.fun_comp _
+
+end Undistinguishable
 
 section Hilbert
 
@@ -226,16 +279,59 @@ def SquareIntegrable : Submodule ℝ (Ω →ₘ[P] (ι → E)) where
     rw [funext_iff] at h1 ⊢
     simp_all
 
+@[coe]
 noncomputable def SquareIntegrable.out (X : SquareIntegrable ι E P 𝓕) : ι → Ω → E := X.2.choose
 
-lemma SquareIntegrable.isSquareIntegrable_out (X : SquareIntegrable ι E P 𝓕) :
+noncomputable instance : CoeFun (SquareIntegrable ι E P 𝓕) (fun _ ↦ ι → Ω → E) where
+  coe := SquareIntegrable.out
+
+lemma SquareIntegrable.isSquareIntegrable_coe (X : SquareIntegrable ι E P 𝓕) :
     IsSquareIntegrable (SquareIntegrable.out X) 𝓕 P := X.2.choose_spec.1
 
-lemma SquareIntegrable.ae_eq_out (X : SquareIntegrable ι E P 𝓕) :
-    ∀ᵐ ω ∂P, ∀ t, X.1 ω t = SquareIntegrable.out X t ω := by
+lemma SquareIntegrable.val_undist_coe (X : SquareIntegrable ι E P 𝓕) :
+    (fun t ω ↦ X.1 ω t) ≡ᵐ[P] X := by
   filter_upwards [X.2.choose_spec.2] with ω h t
+  rw [funext_iff] at h
   rw [← h]
   rfl
+
+lemma SquareIntegrable.eq_iff {X Y : SquareIntegrable ι E P 𝓕} :
+    X = Y ↔ X ≡ᵐ[P] Y where
+  mp h := by rw [h]
+  mpr h := by
+    ext
+    filter_upwards [h, val_undist_coe X, val_undist_coe Y] with ω h1 h2 h3
+    ext t
+    rw [h2, h1, h3]
+
+lemma SquareIntegrable.coe_add (X Y : SquareIntegrable ι E P 𝓕) :
+    X + Y ≡ᵐ[P] X + Y := by
+  filter_upwards [val_undist_coe X, val_undist_coe Y, val_undist_coe (X + Y),
+    X.1.coeFn_add Y] with ω h1 h2 h3 h4 t
+  rw [← h3, Submodule.coe_add, h4]
+  simp_all
+
+lemma SquareIntegrable.coe_smul (X : SquareIntegrable ι E P 𝓕) (c : ℝ) :
+    c • X ≡ᵐ[P] c • X := by
+  filter_upwards [val_undist_coe X, val_undist_coe (c • X), X.1.coeFn_smul c] with ω h1 h2 h3 t
+  rw [← h2, Submodule.coe_smul, h3]
+  simp [h1 t]
+
+lemma SquareIntegrable.coe_neg (X : SquareIntegrable ι E P 𝓕) :
+    -X ≡ᵐ[P] -X := by
+  convert SquareIntegrable.coe_smul X (-1 : ℝ) using 1
+  congr
+  exact (neg_one_smul ℝ X).symm
+  exact (neg_one_smul ℝ _).symm
+
+
+lemma SquareIntegrable.coe_zero :
+    (0 : SquareIntegrable ι E P 𝓕) ≡ᵐ[P] 0 := by
+  filter_upwards [val_undist_coe (0 : SquareIntegrable ι E P 𝓕),
+    AEEqFun.coeFn_zero (β := ι → E)] with ω h1 h2 t
+  rw [funext_iff] at h2
+  rw [← h1, Submodule.coe_zero, h2]
+  simp
 
 noncomputable def SquareIntegrable.mk (X : ι → Ω → E) (hX : IsAESquareIntegrable X 𝓕 P) :
     SquareIntegrable ι E P 𝓕 :=
@@ -263,73 +359,185 @@ lemma SquareIntegrable.mk_eq_mk {X Y : ι → Ω → E} {hX : IsAESquareIntegrab
 
 -- instance : S (SquareIntegrable ι E P 𝓕) := sorry
 
-lemma IsSquareIntegrable.tendsto_ae_limitProcess
-    {X : ι → Ω → E} (hX : IsSquareIntegrable X 𝓕 P) :
-    ∀ᵐ ω ∂P, Tendsto (X · ω) atTop (𝓝 (𝓕.limitProcess X P ω)) := sorry
+lemma limitProcess_ae_eq [Nonempty ι] {X : ι → Ω → E} {g : Ω → E}
+    (mg : StronglyMeasurable[⨆ n, 𝓕 n] g) (hg : ∀ᵐ ω ∂P, Tendsto (X · ω) atTop (𝓝 (g ω))) :
+    𝓕.limitProcess X P =ᵐ[P] g := by
+  have : ∃ g, StronglyMeasurable[⨆ n, 𝓕 n] g ∧ ∀ᵐ ω ∂P, Tendsto (X · ω) atTop (𝓝 (g ω)) :=
+    ⟨g, mg, hg⟩
+  rw [Filtration.limitProcess, dif_pos this]
+  filter_upwards [hg, this.choose_spec.2] with ω h1 h2 using tendsto_nhds_unique h2 h1
 
-instance [Nonempty ι] : NormedAddCommGroup (SquareIntegrable ι E P 𝓕) where
-  norm X := √(P[fun ω ↦ ‖𝓕.limitProcess (SquareIntegrable.out X) P ω‖^2])
-  dist_self X := by
-    simp only [neg_add_cancel]
-    rw [Real.sqrt_eq_zero (by positivity), integral_eq_zero_iff_of_nonneg_ae]
-    · have : ∀ᵐ ω ∂P, 𝓕.limitProcess (SquareIntegrable.out (0 : SquareIntegrable ι E P 𝓕)) P ω =
-          0 := by
-        filter_upwards [(SquareIntegrable.isSquareIntegrable_out
-          (0 : SquareIntegrable ι E P 𝓕)).tendsto_ae_limitProcess,
-          (SquareIntegrable.ae_eq_out (0 : SquareIntegrable ι E P 𝓕)),
-          AEEqFun.coeFn_zero (α := Ω) (β := ι → E)] with ω h1 h2 h3
-        simp only [ZeroMemClass.coe_zero] at h2
-        apply tendsto_nhds_unique h1
-        simp_rw [← h2, h3]
-        simp
-      filter_upwards [this] with ω h
-      rw [h]
-      simp
-    · exact ae_of_all _ fun _ ↦ by positivity
+lemma limitProcess_congr [Nonempty ι] {X Y : ι → Ω → E} (hXY : X ≡ᵐ[P] Y) :
+    𝓕.limitProcess X P =ᵐ[P] 𝓕.limitProcess Y P := by
+  rw [Filtration.limitProcess]
+  split_ifs with h
+  · symm
+    apply limitProcess_ae_eq h.choose_spec.1
+    filter_upwards [h.choose_spec.2, hXY] with ω h1 h2 using h1.congr h2
+  rw [Filtration.limitProcess, dif_neg]
+  contrapose h
+  obtain ⟨g, hg1, hg2⟩ := h
+  refine ⟨g, hg1, ?_⟩
+  filter_upwards [hg2, hXY] with ω h1 h2 using h1.congr (fun t ↦ (h2 t).symm)
 
-  dist_comm := sorry
-  dist_triangle := sorry
-  eq_of_dist_eq_zero := sorry
+lemma limitProcess_const [Nonempty ι] (c : E) :
+    𝓕.limitProcess (fun _ _ ↦ c) P =ᵐ[P] (fun _ ↦ c) := by
+  apply limitProcess_ae_eq stronglyMeasurable_const (by simp)
 
-instance : InnerProductSpace ℝ (SquareIntegrable ι E P 𝓕) where
-  -- smul c X := ⟨c • X.1, by {
-  --   obtain ⟨Y, hY1, hY2⟩ := X.2
-  --   refine ⟨c • Y, hY1.smul c, ?_⟩
-  --   filter_upwards [hY2, AEEqFun.coeFn_smul c X.1] with ω h1 h2
-  --   rw [h2]
-  --   rw [funext_iff] at h1
-  --   ext t
-  --   simp [h1]
-  -- }⟩
-  -- mul_smul a b X := by
-  --   change (⟨(a * b) • X.1, _⟩ : SquareIntegrable ι E P 𝓕) = ⟨a • _, _⟩
-  --   congr 1
-  --   rw [mul_smul]
-  --   congr
-  -- one_smul X := by
-  --   change (⟨1 • X.1, _⟩ : SquareIntegrable ι E P 𝓕) = _
-  --   congr
-  --   simp
-  -- smul_zero X :=
+lemma limitProcess_zero [Nonempty ι] :
+    𝓕.limitProcess (0 : ι → Ω → E) P =ᵐ[P] 0 := limitProcess_const 0
 
-lemma SquareIntegrable.inner_eq {X Y : SquareIntegrable ι E P 𝓕} :
-    ⟪X, Y⟫ = P[fun ω ↦ ⟪𝓕.limitProcess (fun t ω ↦ X.1 ω t) P ω,
-      𝓕.limitProcess (fun t ω ↦ Y.1 ω t) P ω⟫] := sorry
+@[to_fun limitProcess_fun_smul]
+lemma limitProcess_smul [Nonempty ι] (X : ι → Ω → E) (c : ℝ) :
+    𝓕.limitProcess (c • X) P =ᵐ[P] c • 𝓕.limitProcess X P := by
+  obtain rfl | hc := eq_or_ne c 0
+  · simp [limitProcess_zero]
+  nth_rw 2 [Filtration.limitProcess]
+  split_ifs with h
+  · apply limitProcess_ae_eq (h.choose_spec.1.const_smul c)
+    filter_upwards [h.choose_spec.2] with ω h1 using h1.const_smul c
+  rw [Filtration.limitProcess, dif_neg]
+  · simp
+  contrapose h
+  obtain ⟨g, hg1, hg2⟩ := h
+  refine ⟨c⁻¹ • g, hg1.const_smul _, ?_⟩
+  filter_upwards [hg2] with ω h1
+  convert h1.const_smul c⁻¹
+  · simp [hc]
+  · simp
 
-lemma SquareIntegrable.coe_add (X Y : SquareIntegrable ι E P 𝓕) :
-    (X + Y).1 = X.1 + Y.1 := by
+@[to_fun limitProcess_fun_neg]
+lemma limitProcess_neg [Nonempty ι] (X : ι → Ω → E) :
+    𝓕.limitProcess (-X) P =ᵐ[P] -𝓕.limitProcess X P := by
+  nth_rw 2 [Filtration.limitProcess]
+  split_ifs with h
+  · apply limitProcess_ae_eq h.choose_spec.1.neg
+    filter_upwards [h.choose_spec.2] with ω h1 using h1.neg
+  rw [Filtration.limitProcess, dif_neg]
+  · simp
+  contrapose h
+  obtain ⟨g, hg1, hg2⟩ := h
+  refine ⟨-g, hg1.neg, ?_⟩
+  filter_upwards [hg2] with ω h1
+  simpa using h1.neg
+
+@[to_fun limitProcess_fun_add]
+lemma limitProcess_add [Nonempty ι] {X Y : ι → Ω → E}
+    (hX : IsSquareIntegrable X 𝓕 P) (hY : IsSquareIntegrable Y 𝓕 P) :
+    𝓕.limitProcess (X + Y) P =ᵐ[P] 𝓕.limitProcess X P + 𝓕.limitProcess Y P := by
+  apply limitProcess_ae_eq (𝓕.stronglyMeasurable_limitProcess.add 𝓕.stronglyMeasurable_limitProcess)
+  filter_upwards [hX.ae_tendsto_limitProcess, hY.ae_tendsto_limitProcess] with ω h1 h2 using
+    h1.add h2
+
+lemma lpNorm_congr {α ε : Type*} {m0 : MeasurableSpace α} {p : ENNReal} {μ : Measure α}
+    [NormedAddCommGroup ε] {f g : α → ε} (hfg : f =ᵐ[μ] g) :
+    lpNorm f p μ = lpNorm g p μ := by
+  rw [lpNorm]
+  split_ifs with h
+  · rw [eLpNorm_congr_ae hfg, lpNorm, if_pos (h.congr hfg)]
+  · rw [lpNorm, if_neg]
+    contrapose h
+    exact h.congr hfg.symm
+
+lemma lpNorm_pow_two {α ε : Type*} {m0 : MeasurableSpace α} {μ : Measure α}
+    [NormedAddCommGroup ε] {f : α → ε} :
+    (lpNorm f 2 μ) ^ 2 = ∫ a, ‖f a‖ ^ 2 ∂μ := by
   sorry
 
-@[simp]
-lemma SquareIntegrable.coe_zero : (0 : SquareIntegrable ι E P 𝓕).1 = 0 := by
-  sorry
+open TopologicalSpace in
+lemma indistinguishable_of_modification' {T Ω E : Type*} {mΩ : MeasurableSpace Ω} {P : Measure Ω}
+    {X Y : T → Ω → E} [TopologicalSpace E] [TopologicalSpace T]
+    [SeparableSpace T] [T2Space E] [Preorder T]
+    (hX : ∀ᵐ ω ∂P, IsRightContinuous (X · ω)) (hY : ∀ᵐ ω ∂P, IsRightContinuous (Y · ω))
+    (h : ∀ t, X t =ᵐ[P] Y t) :
+    X ≡ᵐ[P] Y := sorry
 
-lemma SquareIntegrable.coe_smul (X : SquareIntegrable ι E P 𝓕) (c : ℝ) :
-    (c • X).1 = c • X.1 := by
-  sorry
+variable [Nonempty ι]
 
-instance : CompleteSpace (SquareIntegrable ι E P 𝓕) := by
-  sorry
+variable (ι E P 𝓕) in
+noncomputable def test : SquareIntegrable ι E P 𝓕 →ₗ[ℝ] Lp E 2 P where
+  toFun X := (SquareIntegrable.isSquareIntegrable_coe X).memLp_limitProcess.toLp
+  map_add' X Y := by
+    rw [MemLp.toLp_congr _ _ (limitProcess_congr (SquareIntegrable.coe_add X Y)),
+      MemLp.toLp_congr _ _ (limitProcess_add _ _), MemLp.toLp_add]
+    · exact (SquareIntegrable.isSquareIntegrable_coe X).memLp_limitProcess.add
+        (SquareIntegrable.isSquareIntegrable_coe Y).memLp_limitProcess
+    · exact SquareIntegrable.isSquareIntegrable_coe X
+    · exact SquareIntegrable.isSquareIntegrable_coe Y
+    · exact ((SquareIntegrable.isSquareIntegrable_coe X).add
+        (SquareIntegrable.isSquareIntegrable_coe Y)).memLp_limitProcess
+  map_smul' c X := by
+    rw [MemLp.toLp_congr _ _ (limitProcess_congr (SquareIntegrable.coe_smul X c)),
+      MemLp.toLp_congr _ _ (limitProcess_smul _ _), MemLp.toLp_const_smul]
+    · simp
+    · exact (SquareIntegrable.isSquareIntegrable_coe X).memLp_limitProcess
+    · exact (SquareIntegrable.isSquareIntegrable_coe X).memLp_limitProcess.const_smul c
+    · exact ((SquareIntegrable.isSquareIntegrable_coe X).smul c).memLp_limitProcess
+
+lemma test_def (X : SquareIntegrable ι E P 𝓕) :
+    test ι E P 𝓕 X = (SquareIntegrable.isSquareIntegrable_coe X).memLp_limitProcess.toLp := rfl
+
+lemma test_ae_eq (X : SquareIntegrable ι E P 𝓕) :
+    test ι E P 𝓕 X =ᵐ[P] 𝓕.limitProcess X P := by
+  rw [test_def]
+  exact MemLp.coeFn_toLp _
+
+variable [SeparableSpace ι]
+
+lemma injective_test : Injective (test ι E P 𝓕) := by
+  rw [injective_iff_map_eq_zero]
+  intro X hX
+  change (SquareIntegrable.isSquareIntegrable_coe X).memLp_limitProcess.toLp = 0 at hX
+  rw [← MemLp.toLp_zero, MemLp.toLp_eq_toLp_iff] at hX
+  · grw [SquareIntegrable.eq_iff]
+    refine Undistinguishable.trans ?_ SquareIntegrable.coe_zero.symm
+    apply indistinguishable_of_modification'
+    · exact ae_of_all _ fun _ ↦ (SquareIntegrable.isSquareIntegrable_coe _).cadlag _
+        |>.right_continuous
+    · exact ae_of_all _ fun _ ↦ isRightContinuous_const 0
+    intro t
+    grw [show (0 : ι → Ω → E) t = 0 from rfl, ← lpNorm_eq_zero _ two_ne_zero, ← toReal_eLpNorm,
+      ENNReal.toReal_eq_zero_iff]
+    · left
+      suffices eLpNorm (X t) 2 P ≤ 0 by simp_all
+      grw [le_iSup fun s ↦ eLpNorm (X s) 2 P,
+        (SquareIntegrable.isSquareIntegrable_coe _).iSup_eLpNorm_eq_eLpNorm_limitProcess]
+      simp only [nonpos_iff_eq_zero]
+      rw [← ofReal_lpNorm, ENNReal.ofReal_eq_zero, lpNorm_congr hX, lpNorm_zero]
+      exact (SquareIntegrable.isSquareIntegrable_coe _).memLp_limitProcess
+    · exact ((SquareIntegrable.isSquareIntegrable_coe X).martingale.stronglyMeasurable
+        t).aestronglyMeasurable.mono (𝓕.le t)
+    · exact (SquareIntegrable.isSquareIntegrable_coe X).memLp_two t
+  · simp
+
+noncomputable instance : NormedAddCommGroup (SquareIntegrable ι E P 𝓕) :=
+  NormedAddCommGroup.induced _ _ (test ι E P 𝓕) injective_test
+
+lemma SquareIntegrable.norm_def {X : SquareIntegrable ι E P 𝓕} :
+    ‖X‖ = lpNorm (𝓕.limitProcess X P) 2 P := by
+  change ‖test ι E P 𝓕 X‖ = _
+  rw [test_def, Lp.norm_toLp, lpNorm, if_pos]
+  exact 𝓕.stronglyMeasurable_limit_process'.aestronglyMeasurable
+
+noncomputable instance : InnerProductSpace ℝ (SquareIntegrable ι E P 𝓕) :=
+  InnerProductSpace.induced (test ι E P 𝓕)
+
+lemma SquareIntegrable.inner_def {X Y : SquareIntegrable ι E P 𝓕} :
+    ⟪X, Y⟫ = P[fun ω ↦ ⟪𝓕.limitProcess X P ω, 𝓕.limitProcess Y P ω⟫] := by
+  rw [inner_induced_eq, test_def, test_def, L2.inner_def]
+  apply integral_congr_ae
+  filter_upwards [MemLp.coeFn_toLp (SquareIntegrable.isSquareIntegrable_coe X).memLp_limitProcess,
+    MemLp.coeFn_toLp (SquareIntegrable.isSquareIntegrable_coe Y).memLp_limitProcess] with ω h1 h2
+  simp_all
+
+noncomputable def isomTest : SquareIntegrable ι E P 𝓕 ≃ᵢ Lp E 2 P where
+  toFun := test ι E P 𝓕
+  invFun := sorry
+  left_inv := sorry
+  right_inv := sorry
+  isometry_toFun X Y := rfl
+
+instance : CompleteSpace (SquareIntegrable ι E P 𝓕) := isomTest.completeSpace
 
 variable [CompleteSpace E]
 

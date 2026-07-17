@@ -28,34 +28,34 @@ variable {ι Ω E : Type*} [LinearOrder ι] [OrderBot ι] [TopologicalSpace ι] 
 /-- A stochastic process is a local martingale if it satisfies the martingale property locally. -/
 def IsLocalMartingale (X : ι → Ω → E) (𝓕 : Filtration ι mΩ) (P : Measure Ω := by volume_tac) :
     Prop :=
-  Locally (fun X ↦ Martingale X 𝓕 P ∧ ∀ ω, IsCadlag (X · ω)) 𝓕 X P
+  Locally (fun X ↦ Martingale X 𝓕 P ∧ ∀ᵐ ω ∂P, IsCadlag (X · ω)) 𝓕 X P
 
 /-- A stochastic process is a local submartingale if it satisfies the submartingale property
 locally. -/
 def IsLocalSubmartingale [LE E] (X : ι → Ω → E) (𝓕 : Filtration ι mΩ)
     (P : Measure Ω := by volume_tac) : Prop :=
-  Locally (fun X ↦ Submartingale X 𝓕 P ∧ ∀ ω, IsCadlag (X · ω)) 𝓕 X P
+  Locally (fun X ↦ Submartingale X 𝓕 P ∧ ∀ᵐ ω ∂P, IsCadlag (X · ω)) 𝓕 X P
 
-lemma Martingale.IsLocalMartingale (hX : Martingale X 𝓕 P) (hC : ∀ ω, IsCadlag (X · ω)) :
+lemma Martingale.IsLocalMartingale (hX : Martingale X 𝓕 P) (hC : ∀ᵐ ω ∂P, IsCadlag (X · ω)) :
     IsLocalMartingale X 𝓕 P :=
   .of_prop ⟨hX, hC⟩
 
 lemma Submartingale.IsLocalSubmartingale [LE E]
-    (hX : Submartingale X 𝓕 P) (hC : ∀ ω, IsCadlag (X · ω)) :
+    (hX : Submartingale X 𝓕 P) (hC : ∀ᵐ ω ∂P, IsCadlag (X · ω)) :
     IsLocalSubmartingale X 𝓕 P :=
   .of_prop ⟨hX, hC⟩
 
 variable [SecondCountableTopology ι] [MeasurableSpace ι] [BorelSpace ι]
 
 lemma IsLocalMartingale.locally_isStronglyProgressive (hX : IsLocalMartingale X 𝓕 P) :
-    Locally (IsStronglyProgressive 𝓕) 𝓕 X P :=
-  Locally.mono (fun _ ⟨hX, hC⟩ ↦ hX.stronglyAdapted.isStronglyProgressive_of_rightContinuous
-    (fun ω ↦ (hC ω).right_continuous)) hX
+    Locally (IsStronglyProgressive 𝓕) 𝓕 X P := sorry
+  -- Locally.mono (fun _ ⟨hX, hC⟩ ↦ hX.stronglyAdapted.isStronglyProgressive_of_rightContinuous
+  --   (fun ω ↦ (hC ω).right_continuous)) hX
 
 lemma IsLocalSubmartingale.locally_isStronglyProgressive [LE E] (hX : IsLocalSubmartingale X 𝓕 P) :
-    Locally (IsStronglyProgressive 𝓕) 𝓕 X P :=
-  Locally.mono (fun _ ⟨hX, hC⟩ ↦ hX.stronglyAdapted.isStronglyProgressive_of_rightContinuous
-    (fun ω ↦ (hC ω).right_continuous)) hX
+    Locally (IsStronglyProgressive 𝓕) 𝓕 X P := sorry
+  -- Locally.mono (fun _ ⟨hX, hC⟩ ↦ hX.stronglyAdapted.isStronglyProgressive_of_rightContinuous
+  --   (fun ω ↦ (hC ω).right_continuous)) hX
 
 variable [PseudoMetrizableSpace ι]
 

@@ -24,12 +24,12 @@ open scoped ENNReal Topology RealInnerProductSpace
 
 namespace ProbabilityTheory
 
-def Undistinguishable {ι Ω E : Type*} {mΩ : MeasurableSpace Ω} (P : Measure Ω) (X Y : ι → Ω → E) :
+def Indistinguishable {ι Ω E : Type*} {mΩ : MeasurableSpace Ω} (P : Measure Ω) (X Y : ι → Ω → E) :
     Prop := ∀ᵐ ω ∂P, ∀ t, X t ω = Y t ω
 
-notation3:50 X " ≡ᵐ[" P:50 "] " Y:50 => Undistinguishable P X Y
+notation3:50 X " ≡ᵐ[" P:50 "] " Y:50 => Indistinguishable P X Y
 
-namespace Undistinguishable
+namespace Indistinguishable
 
 variable {ι Ω E : Type*} {mΩ : MeasurableSpace Ω} {P : Measure Ω} {X Y Z : ι → Ω → E}
 
@@ -53,10 +53,22 @@ protected lemma fun_comp {F : Type*} (h : X ≡ᵐ[P] Y) (f : E → F) :
   filter_upwards [h] with ω h t
   rw [h]
 
+protected lemma fun_comp₂ {F G : Type*} {Z T : ι → Ω → F} (h1 : X ≡ᵐ[P] Y)
+    (h2 : Z ≡ᵐ[P] T) (f : E → F → G) :
+    (fun t ω ↦ f (X t ω) (Z t ω)) ≡ᵐ[P] (fun t ω ↦ f (Y t ω) (T t ω)) := by
+  filter_upwards [h1, h2] with ω h1 h2 t
+  rw [h1, h2]
+
 protected lemma neg [Neg E] (h : X ≡ᵐ[P] Y) :
     -X ≡ᵐ[P] -Y := h.fun_comp _
 
-end Undistinguishable
+protected lemma add [Add E] {Z T : ι → Ω → E} (h1 : X ≡ᵐ[P] Y) (h2 : Z ≡ᵐ[P] T) :
+    X + Z ≡ᵐ[P] Y + T := h1.fun_comp₂ h2 _
+
+protected lemma const_smul {F : Type*} [SMul F E] {c : F} (h : X ≡ᵐ[P] Y) :
+    c • X ≡ᵐ[P] c • Y := h.fun_comp _
+
+end Indistinguishable
 
 variable {ι Ω E : Type*} [LinearOrder ι] [TopologicalSpace ι]
   [NormedAddCommGroup E]
@@ -153,6 +165,14 @@ lemma IsSquareIntegrable.add [CompleteSpace E] (hX : IsSquareIntegrable X 𝓕 P
     _ < ∞ := ENNReal.add_lt_top.mpr ⟨hX_bound, hY_bound⟩
 
 @[to_fun]
+lemma IsAESquareIntegrable.add [CompleteSpace E] (hX : IsAESquareIntegrable X 𝓕 P)
+    (hY : IsAESquareIntegrable Y 𝓕 P) :
+    IsAESquareIntegrable (X + Y) 𝓕 P := by
+  obtain ⟨Z, hZ1, hZ2⟩ := hX
+  obtain ⟨T, hT1, hT2⟩ := hY
+  refine ⟨Z + T, hZ1.add hT1, hZ2.add hT2⟩
+
+@[to_fun]
 lemma IsSquareIntegrable.smul [CompleteSpace E] (hX : IsSquareIntegrable X 𝓕 P) (r : ℝ) :
     IsSquareIntegrable (r • X) 𝓕 P where
   martingale := hX.martingale.smul r
@@ -163,14 +183,31 @@ lemma IsSquareIntegrable.smul [CompleteSpace E] (hX : IsSquareIntegrable X 𝓕 
     exact ENNReal.mul_lt_top ENNReal.coe_lt_top hX.bounded
 
 @[to_fun]
+lemma IsAESquareIntegrable.smul [CompleteSpace E] (hX : IsAESquareIntegrable X 𝓕 P) (r : ℝ) :
+    IsAESquareIntegrable (r • X) 𝓕 P := by
+  obtain ⟨Y, hY1, hY2⟩ := hX
+  exact ⟨r • Y, hY1.smul r, hY2.const_smul⟩
+
+@[to_fun]
 lemma IsSquareIntegrable.neg [CompleteSpace E] (hX : IsSquareIntegrable X 𝓕 P) :
     IsSquareIntegrable (-X) 𝓕 P := by
+  simpa using hX.smul (-1)
+
+@[to_fun]
+lemma IsAESquareIntegrable.neg [CompleteSpace E] (hX : IsAESquareIntegrable X 𝓕 P) :
+    IsAESquareIntegrable (-X) 𝓕 P := by
   simpa using hX.smul (-1)
 
 @[to_fun]
 lemma IsSquareIntegrable.sub [CompleteSpace E] (hX : IsSquareIntegrable X 𝓕 P)
     (hY : IsSquareIntegrable Y 𝓕 P) :
     IsSquareIntegrable (X - Y) 𝓕 P := by
+  simpa [sub_eq_add_neg] using (hX.add hY.neg)
+
+@[to_fun]
+lemma IsAESquareIntegrable.sub [CompleteSpace E] (hX : IsAESquareIntegrable X 𝓕 P)
+    (hY : IsAESquareIntegrable Y 𝓕 P) :
+    IsAESquareIntegrable (X - Y) 𝓕 P := by
   simpa [sub_eq_add_neg] using (hX.add hY.neg)
 
 lemma IsSquareIntegrable.sub_bot [SigmaFiniteFiltration P 𝓕] [CompleteSpace E] [OrderBot ι]
@@ -335,7 +372,7 @@ lemma SquareIntegrable.coe_neg (X : SquareIntegrable ι E P 𝓕) :
   exact (neg_one_smul ℝ X).symm
   exact (neg_one_smul ℝ _).symm
 
-
+variable (E P 𝓕) in
 lemma SquareIntegrable.coe_zero :
     (0 : SquareIntegrable ι E P 𝓕) ≡ᵐ[P] 0 := by
   filter_upwards [val_undist_coe (0 : SquareIntegrable ι E P 𝓕),
@@ -516,7 +553,7 @@ lemma injective_test : Injective (test ι E P 𝓕) := by
   change (SquareIntegrable.isSquareIntegrable_coe X).memLp_limitProcess.toLp = 0 at hX
   rw [← MemLp.toLp_zero, MemLp.toLp_eq_toLp_iff] at hX
   · grw [SquareIntegrable.eq_iff]
-    refine Undistinguishable.trans ?_ SquareIntegrable.coe_zero.symm
+    refine Indistinguishable.trans ?_ (SquareIntegrable.coe_zero _ _ _).symm
     apply indistinguishable_of_modification'
     · exact ae_of_all _ fun _ ↦ (SquareIntegrable.isSquareIntegrable_coe _).cadlag _
         |>.right_continuous
@@ -565,6 +602,7 @@ lemma isCadlag_modif (hX : Martingale X 𝓕 P) (ω : Ω) :
 lemma modification_modif (hX : Martingale X 𝓕 P) (t : ι) :
     modif X hX t =ᵐ[P] X t := sorry
 
+/-- TODO: Re-define `Martingale` to only require `AEStronglyAdapted`. -/
 lemma martingale_modif (hX : Martingale X 𝓕 P) : Martingale (modif X hX) 𝓕 P := sorry
 
 lemma isSquareIntegrable_modif_condExp {X : Ω → E} (hX : MemLp X 2 P) :
@@ -626,46 +664,56 @@ noncomputable def isomTest [OrderTopology ι] [IsFiniteMeasure P] :
     apply Tendsto.congr h1 (h2.comp hu)
   isometry_toFun X Y := rfl
 
-instance : CompleteSpace (SquareIntegrable ι E P 𝓕) := isomTest.completeSpace
+instance [OrderTopology ι] [IsFiniteMeasure P] : CompleteSpace (SquareIntegrable ι E P 𝓕) :=
+  haveI : IsClosed {f : Lp E 2 P | AEStronglyMeasurable[⨆ t, 𝓕 t] f P} :=
+    isClosed_aestronglyMeasurable (iSup_le 𝓕.le)
+  haveI : CompleteSpace {f : Lp E 2 P // AEStronglyMeasurable[⨆ t, 𝓕 t] f P} :=
+    this.completeSpace_coe
+  isomTest.completeSpace
 
-variable [CompleteSpace E]
+variable [OrderTopology ι] [IsFiniteMeasure P]
 
 variable (ι E P 𝓕) in
 /-- The set of continuous square integrable martingales, as a submodule of the type of
 square-integrable martingales, see `SquareIntegrable`. -/
 def continuousSquareIntegrable : Submodule ℝ (SquareIntegrable ι E P 𝓕) where
   carrier := {X | ∃ Y : ι → Ω → E, (∀ ω, Continuous (Y · ω)) ∧ IsSquareIntegrable Y 𝓕 P ∧
-      (fun ω t ↦ Y t ω) =ᵐ[P] X.1}
+      Y ≡ᵐ[P] SquareIntegrable.out X}
   add_mem' := by
     rintro X Y ⟨X', hX1, hX2, hX3⟩ ⟨Y', hY1, hY2, hY3⟩
     refine ⟨X' + Y', fun ω ↦ (hX1 ω).add (hY1 ω), hX2.add hY2, ?_⟩
-    grw [SquareIntegrable.coe_add, AEEqFun.coeFn_add, ← hX3, ← hY3]
-    rfl
+    filter_upwards [SquareIntegrable.coe_add X Y, hX3, hY3] with ω h1 h2 h3 t
+    simp_all
   zero_mem' := by
     refine ⟨0, by fun_prop, sorry, ?_⟩
-    grw [SquareIntegrable.coe_zero, AEEqFun.coeFn_zero]
-    rfl
+    filter_upwards [SquareIntegrable.coe_zero E P 𝓕] with ω h t
+    rw [h]
   smul_mem' := by
     rintro c X ⟨X', hX1, hX2, hX3⟩
     refine ⟨c • X', fun ω ↦ (hX1 ω).const_smul c, hX2.smul c, ?_⟩
-    grw [SquareIntegrable.coe_smul, AEEqFun.coeFn_smul, ← hX3]
-    rfl
+    filter_upwards [SquareIntegrable.coe_smul X c, hX3] with ω h1 h2 t
+    simp_all
 
-noncomputable def continuousSquareIntegrable.out (X : continuousSquareIntegrable ι E P 𝓕) :
-    ι → Ω → E :=
-  X.2.choose
+-- noncomputable def continuousSquareIntegrable.out (X : continuousSquareIntegrable ι E P 𝓕) :
+--     ι → Ω → E :=
+--   X.2.choose
 
-lemma continuous_out (X : continuousSquareIntegrable ι E P 𝓕) (ω : Ω) :
-    Continuous (continuousSquareIntegrable.out X · ω) :=
-  X.2.choose_spec.1 ω
+noncomputable instance : CoeFun (continuousSquareIntegrable ι E P 𝓕) (fun _ ↦ ι → Ω → E) where
+  coe X := X.1
 
-lemma isSquareIntegrable_out (X : continuousSquareIntegrable ι E P 𝓕) :
-    IsSquareIntegrable (continuousSquareIntegrable.out X) 𝓕 P :=
-  X.2.choose_spec.2.1
+lemma continuous_coe (X : continuousSquareIntegrable ι E P 𝓕) :
+    ∀ᵐ ω ∂P, Continuous (X · ω) := by
+  obtain ⟨Y, hY1, -, hY2⟩ := X.2
+  filter_upwards [hY2] with ω h
+  apply (hY1 ω).congr h
 
-lemma out_ae_eq (X : continuousSquareIntegrable ι E P 𝓕) :
-    (fun ω t ↦ continuousSquareIntegrable.out X t ω) =ᵐ[P] X.1.1 :=
-  X.2.choose_spec.2.2
+-- lemma isSquareIntegrable_out (X : continuousSquareIntegrable ι E P 𝓕) :
+--     IsSquareIntegrable (continuousSquareIntegrable.out X) 𝓕 P :=
+--   X.2.choose_spec.2.1
+
+-- lemma out_ae_eq (X : continuousSquareIntegrable ι E P 𝓕) :
+--     (fun ω t ↦ continuousSquareIntegrable.out X t ω) =ᵐ[P] X.1.1 :=
+--   X.2.choose_spec.2.2
 
 instance : IsClosed (continuousSquareIntegrable ι E P 𝓕 : Set (SquareIntegrable ι E P 𝓕)) := by
   sorry
@@ -679,35 +727,38 @@ of strongly measurable functions, while here we are interested in undistinguisha
 so measurablility is the way to go. It seems we will need to duplicate `AEEqFun` for the measurable
 case. -/
 noncomputable def continuousPart (X : ι → Ω → E) (𝓕 : Filtration ι mΩ) (P : Measure Ω)
-    [SigmaFiniteFiltration P 𝓕] : ι → Ω → E :=
+    [IsFiniteMeasure P] [SigmaFiniteFiltration P 𝓕] : ι → Ω → E :=
   if hX : IsAESquareIntegrable X 𝓕 P
-    then continuousSquareIntegrable.out
-      ((continuousSquareIntegrable ι E P 𝓕).orthogonalProjectionOnto (.mk X hX))
+    then (continuousSquareIntegrable ι E P 𝓕).orthogonalProjectionOnto (SquareIntegrable.mk X hX)
     else 0
 
-lemma continuousPart_congr (X Y : ι → Ω → E) (hXY : ∀ᵐ ω ∂P, ∀ t, X t ω = Y t ω) :
+lemma continuousPart_congr {X Y : ι → Ω → E} (hXY : X ≡ᵐ[P] Y) :
     continuousPart X 𝓕 P = continuousPart Y 𝓕 P := by
   by_cases hX : IsAESquareIntegrable X 𝓕 P
   · simp only [continuousPart, hX, ↓reduceDIte, hX.congr hXY]
     ext t ω
-    congr 2
+    congr 3
     rwa [SquareIntegrable.mk_eq_mk]
   simp [continuousPart, hX, (isAESquareIntegrable_congr hXY).not.1 hX]
 
-lemma continuous_continuousPart (X : ι → Ω → E) (ω : Ω) :
-    Continuous (continuousPart X 𝓕 P · ω) := by
+lemma continuous_continuousPart (X : ι → Ω → E) :
+    ∀ᵐ ω ∂P, Continuous (continuousPart X 𝓕 P · ω) := by
   rw [continuousPart]
   split_ifs
-  · exact continuous_out _ _
-  simpa using continuous_const
+  · exact continuous_coe _
+  simp [continuous_const]
+
+lemma isSquareIntegrable_continuousPart {X : ι → Ω → E} :
+    IsSquareIntegrable (continuousPart X 𝓕 P) 𝓕 P := by
+  rw [continuousPart]
+  split_ifs
+  · exact SquareIntegrable.isSquareIntegrable_coe _
+  · sorry
 
 variable (P 𝓕) in
 noncomputable def discontinuousPart (X : ι → Ω → E) (𝓕 : Filtration ι mΩ) (P : Measure Ω)
-    [SigmaFiniteFiltration P 𝓕] : ι → Ω → E :=
-  fun t ω ↦ X t ω - (continuousPart X 𝓕 P t ω)
-
-lemma discontinuousPart_def : discontinuousPart X 𝓕 P =
-    (fun t ω ↦ X t ω - (continuousPart X 𝓕 P t ω)) := rfl
+    [IsFiniteMeasure P] [SigmaFiniteFiltration P 𝓕] : ι → Ω → E :=
+  X - continuousPart X 𝓕 P
 
 variable (ι E P 𝓕) in
 noncomputable def discontinuousSquareIntegrable : Submodule ℝ (SquareIntegrable ι E P 𝓕) :=
@@ -721,10 +772,14 @@ variable (P 𝓕) in
 def IsPurelyDiscontinuous [Bot ι] (X : ι → Ω → E) : Prop :=
   IsAESquareIntegrable X 𝓕 P ∧
   ∀ Y, IsAESquareIntegrable Y 𝓕 P → (∀ᵐ ω ∂P, Continuous (Y · ω)) →
-    (∀ᵐ ω ∂P, ⟪X ⊥ ω, Y ⊥ ω⟫ = 0) ∧
-    ∀ τ, IsStoppingTime 𝓕 τ → P[fun ω ↦ ⟪stoppedValue' P 𝓕 X τ ω, stoppedValue' P 𝓕 Y τ ω⟫] = 0
+    P[fun ω ↦ ⟪𝓕.limitProcess X P ω, 𝓕.limitProcess Y P ω⟫] = 0
 
-lemma test [Bot ι] (X : ι → Ω → E)
+lemma isPurelyDiscontinuous_discontinuousPart [Bot ι] {X : ι → Ω → E}
+    (hX : IsAESquareIntegrable X 𝓕 P) :
+    IsPurelyDiscontinuous P 𝓕 (discontinuousPart X 𝓕 P) := by
+  constructor
+  · exact hX.sub isSquareIntegrable_continuousPart.isAESquareIntegrable
+  intro Y hY1 hY2
 
 lemma stoppedProcess_continuousPart [Nonempty ι] (X : ι → Ω → E) (τ : Ω → WithTop ι) :
     ∀ᵐ ω ∂P, ∀ t, continuousPart (stoppedProcess X τ) 𝓕 P t ω =

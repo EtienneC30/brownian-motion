@@ -238,4 +238,10 @@ instance {𝓕 : Filtration ι m} {μ : Measure Ω} [u : IsComplete 𝓕 μ] {i 
     (μ.trim <| 𝓕.le i).IsComplete :=
   ⟨fun _ hs ↦ IsComplete.measurableSet_of_null (measure_eq_zero_of_trim_eq_zero (𝓕.le i) hs) i⟩
 
+lemma measurableSet_of_null' [Nonempty ι] (𝓕 : Filtration ι m) (μ : Measure Ω) [h𝓕 : IsComplete 𝓕 μ]
+    {s : Set Ω} (hs : μ s = 0) :
+    MeasurableSet s := by
+  let i : ι := Classical.ofNonempty
+  exact 𝓕.le i s <| h𝓕.measurableSet_of_null hs i
+
 end MeasureTheory.Filtration

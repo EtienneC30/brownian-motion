@@ -503,4 +503,35 @@ theorem maximal_ineq_norm (hmar : Martingale X 𝓕 P) (ε : ℝ) (n : ι)
   refine maximal_ineq hmar.submartingale_norm (fun _ _ ↦ norm_nonneg _) ε n fun ω => ?_
   exact (hX_cont ω).continuous_comp continuous_norm
 
+theorem integral_iSup_norm_rpow_le (hmar : Martingale X 𝓕 P) (T : ι)
+    (hX_cont : ∀ ω, IsRightContinuous (X · ω)) {p : ℝ} (hp : 1 < p) :
+    ∫⁻ ω, ⨆ t ≤ T, ‖X t ω‖ₑ ^ p ∂P ≤ (.ofReal ((p / (p - 1)) ^ p : ℝ)) * ∫⁻ ω, ‖X T ω‖ₑ ^ p ∂P := by
+  sorry
+
+theorem integral_iSup_norm_rpow_le' (hmar : Martingale X 𝓕 P)
+    (hX_cont : ∀ ω, IsRightContinuous (X · ω)) {p : ℝ} (hp : 1 < p) :
+    ∫⁻ ω, (⨆ t, ‖X t ω‖ₑ) ^ p ∂P ≤
+      (.ofReal ((p / (p - 1)) ^ p : ℝ)) * ∫⁻ ω, ‖𝓕.limitProcess X P ω‖ₑ ^ p ∂P := by
+  sorry
+
+theorem integral_iSup_norm_rpow_two_le' (hmar : Martingale X 𝓕 P)
+    (hX_cont : ∀ ω, IsRightContinuous (X · ω)) :
+    ∫⁻ ω, (⨆ t, ‖X t ω‖ₑ) ^ 2 ∂P ≤ 4 * ∫⁻ ω, ‖𝓕.limitProcess X P ω‖ₑ ^ 2 ∂P := by
+  sorry
+
+theorem integral_iSup_norm_rpow_rpow_inv_le (hmar : Martingale X 𝓕 P) (T : ι)
+    (hX_cont : ∀ ω, IsRightContinuous (X · ω)) {p : ℝ} (hp : 1 < p) :
+    (∫⁻ ω, ⨆ t ≤ T, ‖X t ω‖ₑ ^ p ∂P) ^ (1 / p) ≤
+      (.ofReal ((p / (p - 1)) : ℝ)) * (∫⁻ ω, ‖X T ω‖ₑ ^ p ∂P) ^ (1 / p) := by
+  obtain h | h := eq_or_ne (∫⁻ ω, ‖X T ω‖ₑ ^ p ∂P) ∞
+  · rw [h, ENNReal.top_rpow_of_pos, ENNReal.mul_top]
+    · simp
+    · simp only [ne_eq, ENNReal.ofReal_eq_zero, not_le]; positivity
+    · positivity
+  grw [integral_iSup_norm_rpow_le hmar T hX_cont hp, ENNReal.mul_rpow_of_ne_top,
+    ENNReal.ofReal_rpow_of_nonneg, one_div, Real.rpow_rpow_inv]
+  any_goals positivity
+  · simp
+  · exact h
+
 end ProbabilityTheory

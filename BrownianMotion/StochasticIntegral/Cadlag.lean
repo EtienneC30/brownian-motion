@@ -27,10 +27,24 @@ variable {ι E : Type*} [TopologicalSpace ι]
 abbrev Function.IsRightContinuous [TopologicalSpace E] [Preorder ι] (f : ι → E) :=
   ∀ a, ContinuousWithinAt f (Set.Ioi a) a
 
+lemma Continuous.isRightContinuous [TopologicalSpace E] [Preorder ι]
+    {f : ι → E} (hf : Continuous f) :
+    f.IsRightContinuous :=
+  fun _ ↦ hf.continuousWithinAt
+
 lemma Function.IsRightContinuous.continuous_comp {F : Type*} [TopologicalSpace E]
     [TopologicalSpace F] [Preorder ι] {g : E → F}
     {f : ι → E} (hg : Continuous g) (hf : IsRightContinuous f) : IsRightContinuous (g ∘ f) :=
   fun x ↦ (hg.tendsto (f x)).comp (hf x)
+
+lemma Function.IsRightContinuous.comp_continuous {F : Type*} [TopologicalSpace E]
+    [TopologicalSpace F] [Preorder ι] {g : F → ι} [Preorder F]
+    {f : ι → E} (hg : Continuous g) (hf : IsRightContinuous f)
+    (hg' : StrictMono g) : IsRightContinuous (f ∘ g) := by
+  intro x
+  apply (hf (g x)).comp hg.continuousWithinAt
+  intro y hy
+  grind [StrictMono]
 
 @[simp]
 lemma Function.isRightContinuous_const [TopologicalSpace E] [Preorder ι] (c : E) :
@@ -41,6 +55,11 @@ lemma Function.isRightContinuous_const [TopologicalSpace E] [Preorder ι] (c : E
 structure IsCadlag [TopologicalSpace E] [Preorder ι] (f : ι → E) : Prop where
   right_continuous : Function.IsRightContinuous f
   left_limit : ∀ x, ∃ l, Tendsto f (𝓝[<] x) (𝓝 l)
+
+lemma Continuous.isCadlag [TopologicalSpace E] [Preorder ι] {f : ι → E} (hf : Continuous f) :
+    IsCadlag f where
+  right_continuous := hf.isRightContinuous
+  left_limit x := ⟨f x, hf.tendsto x |>.mono_left nhdsWithin_le_nhds⟩
 
 @[simp]
 lemma isCadlag_const [TopologicalSpace E] [Preorder ι] (c : E) : IsCadlag (fun _ ↦ c : ι → E) :=

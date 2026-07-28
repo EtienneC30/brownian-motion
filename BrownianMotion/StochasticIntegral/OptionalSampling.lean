@@ -6,7 +6,7 @@ Authors: Kexing Ying
 module
 
 public import BrownianMotion.Auxiliary.Adapted
-public import BrownianMotion.Auxiliary.StronglyMeasurablePath
+public import BrownianMotion.Auxiliary.StoppedValue
 public import BrownianMotion.StochasticIntegral.ApproxSeq
 public import Mathlib.Probability.Martingale.Centering
 
@@ -20,9 +20,8 @@ namespace MeasureTheory
 namespace Martingale
 
 variable {ι Ω E : Type*} [LinearOrder ι] [TopologicalSpace ι] [OrderTopology ι]
-  [OrderBot ι] [MeasurableSpace ι] [SecondCountableTopology ι] [BorelSpace ι]
-  [NormedAddCommGroup E]
-  [MeasurableSpace E] [BorelSpace E]
+  [OrderBot ι] [SecondCountableTopology ι]
+  [NormedAddCommGroup E] [NormedSpace ℝ E] [CompleteSpace E]
   {mΩ : MeasurableSpace Ω} {𝓕 : Filtration ι mΩ} {μ : Measure Ω} [IsFiniteMeasure μ]
   {X : ι → Ω → E} {τ σ : Ω → WithTop ι} {n : ι}
 
@@ -46,6 +45,7 @@ theorem condExp_stoppedValue_stopping_time_ae_eq_restrict_le_of_countable_range
     (hτ : IsStoppingTime 𝓕 τ) (hσ : IsStoppingTime 𝓕 σ)
     (hτ_countable_range : (Set.range τ).Countable) :
     μ[stoppedValue X τ|hσ.measurableSpace] =ᵐ[μ.restrict {x : Ω | τ x ≤ σ x}] stoppedValue X τ := by
+  borelize ι
   rw [ae_eq_restrict_iff_indicator_ae_eq
     (hτ.measurableSpace_le _ (hτ.measurableSet_le_stopping_time hσ))]
   refine (condExp_indicator
@@ -77,6 +77,7 @@ theorem stoppedValue_min_ae_eq_condExp_of_countable_range
     (hτ : IsStoppingTime 𝓕 τ) (hσ : IsStoppingTime 𝓕 σ) {n : ι} (hτ_le : ∀ x, τ x ≤ n)
     (hτ_countable_range : (Set.range τ).Countable) (hσ_countable_range : (Set.range σ).Countable) :
     (stoppedValue X fun x ↦ min (σ x) (τ x)) =ᵐ[μ] μ[stoppedValue X τ|hσ.measurableSpace] := by
+  borelize ι
   refine
     (h.stoppedValue_ae_eq_condExp_of_le_of_countable_range hτ
       (hσ.min hτ) (fun x ↦ min_le_right _ _) hτ_le hτ_countable_range ?_).trans ?_
@@ -89,7 +90,7 @@ theorem stoppedValue_min_ae_eq_condExp_of_countable_range
       rw [Filter.EventuallyEq, ae_restrict_iff'] at this
       swap; · exact hτ.measurableSpace_le _ (hτ.measurableSet_le_stopping_time hσ)
       filter_upwards [this] with x hx hx_mem
-      simp only [Set.mem_compl_iff, Set.mem_setOf_eq, not_le] at hx_mem
+      simp only [Set.mem_compl_iff, Set.mem_ofPred_eq, not_le] at hx_mem
       exact hx hx_mem.le
     apply Filter.EventuallyEq.trans _ ((condExp_min_stopping_time_ae_eq_restrict_le hτ hσ).trans _)
     · exact stoppedValue X τ
@@ -98,8 +99,8 @@ theorem stoppedValue_min_ae_eq_condExp_of_countable_range
     · have h1 : μ[stoppedValue X τ|hτ.measurableSpace] = stoppedValue X τ := by
         apply condExp_of_stronglyMeasurable hτ.measurableSpace_le
         · exact (stronglyMeasurable_stoppedValue
-          (h.stronglyAdapted.isStronglyProgressive_of_rightContinuous hRC) hRC
-          hτ)
+            (h.stronglyAdapted.isStronglyProgressive_of_rightContinuous hRC) hRC
+            hτ)
         · exact h.integrable_stoppedValue_of_countable_range τ hτ hτ_le hτ_countable_range
       rw [h1]
       exact (h.condExp_stoppedValue_stopping_time_ae_eq_restrict_le_of_countable_range hRC hτ_le
@@ -112,6 +113,7 @@ theorem stoppedValue_min_ae_eq_condExp_of_discreteApproxSequence
     (hτ : IsStoppingTime 𝓕 τ) (hσ : IsStoppingTime 𝓕 σ) {n : ι} (hτ_le : ∀ x, τ x ≤ n)
     (τn : DiscreteApproxSequence 𝓕 τ μ) (σn : DiscreteApproxSequence 𝓕 σ μ) :
     (stoppedValue X fun x ↦ min (τ x) (σ x)) =ᵐ[μ] μ[stoppedValue X τ|hσ.measurableSpace] := by
+  borelize ι
   set τn' := (discreteApproxSequence_of 𝓕 hτ_le τn).inf σn
   have hint (m : ℕ) : stoppedValue X (τn' m) =ᵐ[μ]
       μ[stoppedValue X (discreteApproxSequence_of 𝓕 hτ_le τn m) |
@@ -127,7 +129,8 @@ theorem stoppedValue_min_ae_eq_condExp_of_discreteApproxSequence
   refine ae_eq_condExp_of_forall_setIntegral_eq _ hintgbl ?_ ?_
     ((stronglyMeasurable_stoppedValue
         (h.stronglyAdapted.isStronglyProgressive_of_rightContinuous hRC) hRC
-        (hτ.min hσ)).aestronglyMeasurable.mono ((hτ.min hσ).measurableSpace_mono hσ <| fun ω ↦ min_le_right _ _))
+        (hτ.min hσ)).aestronglyMeasurable.mono ((hτ.min hσ).measurableSpace_mono hσ <|
+          fun ω ↦ min_le_right _ _))
   · exact fun s hs _ ↦ (integrable_stoppedValue_of_discreteApproxSequence' h hRC
       (fun _ ↦ min_le_of_left_le <| hτ_le _) <| τn.inf σn).integrableOn
   rintro s hs -
@@ -189,10 +192,10 @@ theorem condExp_stoppedValue_ae_eq_stoppedProcess [Approximable 𝓕 μ] {n : ι
   exact EventuallyEq.trans (Eq.eventuallyEq <| by simp)
     (stoppedValue_min_ae_eq_condExp' h hRC hτ (isStoppingTime_const 𝓕 i) hτ_le).symm
 
-lemma stoppedProcess [Approximable 𝓕 μ]
-    (h : Martingale X 𝓕 μ) (hRC : ∀ ω, IsRightContinuous (X · ω))
-    (hτ : IsStoppingTime 𝓕 τ) :
+lemma stoppedProcess [Approximable 𝓕 μ] [PseudoMetrizableSpace ι]
+    (h : Martingale X 𝓕 μ) (hRC : ∀ ω, IsRightContinuous (X · ω)) (hτ : IsStoppingTime 𝓕 τ) :
     Martingale (stoppedProcess X τ) 𝓕 μ := by
+  borelize ι
   constructor
   · exact fun t ↦
       h.stronglyAdapted.isStronglyProgressive_of_rightContinuous hRC |>.stoppedProcess hτ

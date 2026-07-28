@@ -90,6 +90,7 @@ lemma _root_.tendsto_inv_add_atTop_nhds_zero_nat {𝕜 : Type*} [DivisionSemirin
     Tendsto (fun n : ℕ ↦ ((n : 𝕜) + 1)⁻¹) atTop (𝓝 0) :=
   by simpa using tendsto_one_div_add_atTop_nhds_zero_nat (𝕜 := 𝕜)
 
+set_option backward.isDefEq.respectTransparency false in
 lemma maximal_ineq_countable_ennreal (hsub : Submartingale Y 𝓕 P) (hnonneg : 0 ≤ Y) (ε : ℝ≥0)
     (n : ι) :
     ε • P.real {ω | (ε : ℝ≥0∞) ≤ ⨆ i ≤ n, ENNReal.ofReal (Y i ω)} ≤
@@ -104,10 +105,7 @@ lemma maximal_ineq_countable_ennreal (hsub : Submartingale Y 𝓕 P) (hnonneg : 
   let J (k : ℕ) : Finset ι := insert n ((range k).image f |>.filter (· ≤ n))
   have hJn (k) : ∀ i ∈ J k, i ≤ n := by simp [J]
   have hnJ (k) : n ∈ J k := by simp [J]
-  have hJmono {k l : ℕ} (hkl : k ≤ l) : J k ⊆ J l := by
-    unfold J
-    gcongr
-    exact image_mono _ (range_mono hkl)
+  have hJmono {k l : ℕ} (hkl : k ≤ l) : J k ⊆ J l := by unfold J; gcongr
   have hmemJ (k) (h : f k ≤ n) : f k ∈ J (k + 1) := by
     simpa [J, h] using .inr ⟨k, by omega, rfl⟩
   -- The long inequality (see blueprint)
@@ -120,13 +118,15 @@ lemma maximal_ineq_countable_ennreal (hsub : Submartingale Y 𝓕 P) (hnonneg : 
         setIntegral_le_integral (hsub.integrable n) (.of_forall (hnonneg n))
     calc
       _ = ε' • P.real (⋃ i ≤ n, {ω | (ε' : ℝ) < Y i ω}) := by
-        congr!; ext ω
+        congr!
+        ext ω
         simp_rw [supY, lt_iSup_iff]
         lift Y to ι → Ω → ℝ≥0 using hnonneg
         simp
       _ = ε' • P.real (⋃ k, {ω | (ε' : ℝ) < (J k).sup' ⟨n, hnJ k⟩ fun i ↦ Y i ω}) := by
-        congr!; ext ω
-        simp only [Set.mem_iUnion, Set.mem_setOf_eq, exists_prop, lt_sup'_iff]
+        congr!
+        ext ω
+        simp only [Set.mem_iUnion, Set.mem_ofPred_eq, exists_prop, lt_sup'_iff]
         constructor
         · rintro ⟨i, hi, h⟩
           obtain ⟨k, rfl⟩ := hf i
@@ -144,7 +144,7 @@ lemma maximal_ineq_countable_ennreal (hsub : Submartingale Y 𝓕 P) (hnonneg : 
         gcongr
         · use ε' • P.real Set.univ
           simp only [upperBounds, le_sup'_iff, Set.mem_range, forall_exists_index,
-            forall_apply_eq_imp_iff, Set.mem_setOf_eq]
+            forall_apply_eq_imp_iff, Set.mem_ofPred_eq]
           intro k
           gcongr
           · finiteness -- gcongr bug?
@@ -172,7 +172,7 @@ lemma maximal_ineq_countable_ennreal (hsub : Submartingale Y 𝓕 P) (hnonneg : 
   -- TODO: is there a way to avoid duplicaiton below
   have hinter_lt (c : Ω → ℝ≥0∞) : {ω | ε ≤ c ω} = ⋂ r : ℕ, {ω | ε' r < c ω} := by
     ext ω
-    simp only [Set.mem_setOf_eq, Set.mem_iInter]
+    simp only [Set.mem_ofPred_eq, Set.mem_iInter]
     constructor
     · intro h r
       push_cast [ε']
@@ -190,7 +190,7 @@ lemma maximal_ineq_countable_ennreal (hsub : Submartingale Y 𝓕 P) (hnonneg : 
   have hinter_le (c : Ω → ℝ≥0∞) : {ω | ε ≤ c ω} = ⋂ r : ℕ, {ω | ε' r ≤ c ω} := by
     -- same as hinter, but with ≤ instead of <
     ext ω
-    simp only [Set.mem_setOf_eq, Set.mem_iInter]
+    simp only [Set.mem_ofPred_eq, Set.mem_iInter]
     constructor
     · intro h r
       push_cast [ε']
@@ -253,7 +253,7 @@ lemma _root_.MeasureTheory.Submartingale.iSup_ofReal_ne_top (hsub : Submartingal
   push Not
   convert Antitone.measure_iInter (s := fun ε : ℝ≥0 ↦ {ω | (ε : ℝ≥0∞) ≤ supY ω}) ?_ ?_ ?_
   · ext ω
-    simp only [Set.mem_setOf_eq, Set.mem_iInter]
+    simp only [Set.mem_ofPred_eq, Set.mem_iInter]
     constructor
     · simp +contextual
     · apply ENNReal.eq_top_of_forall_nnreal_le
@@ -344,7 +344,7 @@ theorem measurable_iSup_of_rightContinuous {β : Type*} {f : ι → Ω → β}
   let S := T ∪ {x | 𝓝[>] x = ⊥}
   suffices h : ⋃ i, f i ⁻¹' Set.Ioi b = ⋃ i ∈ S, f i ⁻¹' Set.Ioi b from by
     rw [h]
-    exact MeasurableSet.biUnion (hT_countable.union countable_setOf_isolated_right)
+    exact MeasurableSet.biUnion (hT_countable.union countable_setOfPred_isolated_right)
       fun t ht => hm t measurableSet_Ioi
   ext x
   refine ⟨fun h => ?_, fun h => Set.iUnion₂_subset_iUnion _ _ h⟩
@@ -365,6 +365,7 @@ theorem measurable_iSup_of_rightContinuous {β : Type*} {f : ι → Ω → β}
     obtain ⟨k, hk⟩ := hS.exists_mem_open isOpen_Ioo this
     exact Set.mem_biUnion hk.1 (hu.2 hk.2)
 
+set_option backward.isDefEq.respectTransparency false in
 theorem maximal_ineq_ennreal (hsub : Submartingale Y 𝓕 P) (hnonneg : 0 ≤ Y) (ε : ℝ≥0) (n : ι)
     (hY_cont : ∀ ω, IsRightContinuous (Y · ω)) :
     ε * P.real {ω | (ε : ℝ≥0∞) ≤ ⨆ i : Set.Iic n, ENNReal.ofReal (Y i ω)} ≤
@@ -373,7 +374,7 @@ theorem maximal_ineq_ennreal (hsub : Submartingale Y 𝓕 P) (hnonneg : 0 ≤ Y)
   let S : Set (Set.Iic n) := T ∪ {x | 𝓝[>] x = ⊥}
   have hS : Countable S := by
     rw [Set.countable_coe_iff]
-    exact (Set.Countable.mono (by simp) hT_countable).union countable_setOf_isolated_right
+    exact (Set.Countable.mono (by simp) hT_countable).union countable_setOfPred_isolated_right
   have hn : ⟨n, le_rfl⟩ ∈ S := by
     refine Set.mem_union_right ?_ ?_
     have : Set.Ioi (⟨n, le_rfl⟩ : Set.Iic n) = ∅ := by ext x; aesop
@@ -432,7 +433,7 @@ lemma _root_.MeasureTheory.Submartingale.rightCont_iSup_ofReal_ne_top (hsub : Su
   push Not
   convert Antitone.measure_iInter (s := fun ε : ℝ≥0 ↦ {ω | (ε : ℝ≥0∞) ≤ supY ω}) ?_ ?_ ?_
   · ext ω
-    simp only [Set.mem_setOf_eq, Set.mem_iInter]
+    simp only [Set.mem_ofPred_eq, Set.mem_iInter]
     constructor
     · simp +contextual
     · apply ENNReal.eq_top_of_forall_nnreal_le
@@ -503,35 +504,16 @@ theorem maximal_ineq_norm (hmar : Martingale X 𝓕 P) (ε : ℝ) (n : ι)
   refine maximal_ineq hmar.submartingale_norm (fun _ _ ↦ norm_nonneg _) ε n fun ω => ?_
   exact (hX_cont ω).continuous_comp continuous_norm
 
-theorem integral_iSup_norm_rpow_le (hmar : Martingale X 𝓕 P) (T : ι)
+theorem integral_iSup_le_norm_rpow_le (hmar : Martingale X 𝓕 P) (T : ι)
     (hX_cont : ∀ ω, IsRightContinuous (X · ω)) {p : ℝ} (hp : 1 < p) :
-    ∫⁻ ω, ⨆ t ≤ T, ‖X t ω‖ₑ ^ p ∂P ≤ (.ofReal ((p / (p - 1)) ^ p : ℝ)) * ∫⁻ ω, ‖X T ω‖ₑ ^ p ∂P := by
+    ∫⁻ ω, (⨆ t ≤ T, ‖X t ω‖ₑ) ^ p ∂P ≤
+      (.ofReal ((p / (p - 1)) ^ p : ℝ)) * ∫⁻ ω, ‖X T ω‖ₑ ^ p ∂P := by
   sorry
 
-theorem integral_iSup_norm_rpow_le' (hmar : Martingale X 𝓕 P)
+theorem integral_iSup_norm_rpow_le (hmar : Martingale X 𝓕 P)
     (hX_cont : ∀ ω, IsRightContinuous (X · ω)) {p : ℝ} (hp : 1 < p) :
     ∫⁻ ω, (⨆ t, ‖X t ω‖ₑ) ^ p ∂P ≤
-      (.ofReal ((p / (p - 1)) ^ p : ℝ)) * ∫⁻ ω, ‖𝓕.limitProcess X P ω‖ₑ ^ p ∂P := by
+      (.ofReal ((p / (p - 1)) ^ p : ℝ)) * ⨆ t, ∫⁻ ω, ‖X t ω‖ₑ ^ p ∂P := by
   sorry
-
-theorem integral_iSup_norm_rpow_two_le' (hmar : Martingale X 𝓕 P)
-    (hX_cont : ∀ ω, IsRightContinuous (X · ω)) :
-    ∫⁻ ω, (⨆ t, ‖X t ω‖ₑ) ^ 2 ∂P ≤ 4 * ∫⁻ ω, ‖𝓕.limitProcess X P ω‖ₑ ^ 2 ∂P := by
-  sorry
-
-theorem integral_iSup_norm_rpow_rpow_inv_le (hmar : Martingale X 𝓕 P) (T : ι)
-    (hX_cont : ∀ ω, IsRightContinuous (X · ω)) {p : ℝ} (hp : 1 < p) :
-    (∫⁻ ω, ⨆ t ≤ T, ‖X t ω‖ₑ ^ p ∂P) ^ (1 / p) ≤
-      (.ofReal ((p / (p - 1)) : ℝ)) * (∫⁻ ω, ‖X T ω‖ₑ ^ p ∂P) ^ (1 / p) := by
-  obtain h | h := eq_or_ne (∫⁻ ω, ‖X T ω‖ₑ ^ p ∂P) ∞
-  · rw [h, ENNReal.top_rpow_of_pos, ENNReal.mul_top]
-    · simp
-    · simp only [ne_eq, ENNReal.ofReal_eq_zero, not_le]; positivity
-    · positivity
-  grw [integral_iSup_norm_rpow_le hmar T hX_cont hp, ENNReal.mul_rpow_of_ne_top,
-    ENNReal.ofReal_rpow_of_nonneg, one_div, Real.rpow_rpow_inv]
-  any_goals positivity
-  · simp
-  · exact h
 
 end ProbabilityTheory

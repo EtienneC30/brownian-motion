@@ -53,8 +53,9 @@ lemma continuous_coe {X : SquareIntegrable E P 𝓕} (hX : X ∈ continuousSquar
   rw [SquareIntegrable.out, dif_pos this]
   exact this.choose_spec.1 ω
 
-omit [IsFiniteMeasure P] in
-lemma IsAESquareIntegrable.isSquareIntegrable_toContinuous [h𝓕 : 𝓕.IsComplete P]
+variable [OrderTopology ι] [SecondCountableTopology ι]
+
+lemma IsAESquareIntegrable.isSquareIntegrable_toContinuous [Nonempty ι] [h𝓕 : 𝓕.IsComplete P]
     (hX1 : ∀ᵐ ω ∂P, Continuous (X · ω)) (hX2 : IsAESquareIntegrable X 𝓕 P) :
     IsSquareIntegrable (hX2.toContinuous X) 𝓕 P := by
   have obv : ∀ᵐ ω ∂P, Continuous (hX2.choose · ω) := by
@@ -80,7 +81,7 @@ lemma IsAESquareIntegrable.isSquareIntegrable_toContinuous [h𝓕 : 𝓕.IsCompl
 
 /-- A square integrable martingale that is almost surely continuous is indistinguishable
 from a square integrable martingale that is continuous everywhere. -/
-lemma mem_continuousSquareIntegrable [𝓕.IsComplete P] {X : SquareIntegrable E P 𝓕}
+lemma mem_continuousSquareIntegrable [Nonempty ι] [𝓕.IsComplete P] {X : SquareIntegrable E P 𝓕}
     (hX : ∀ᵐ ω ∂P, Continuous (X · ω)) : X ∈ continuousSquareIntegrable E P 𝓕 :=
   ⟨X.isAESquareIntegrable_coe.toContinuous X,
     X.isAESquareIntegrable_coe.continuous_toContinuous,
@@ -89,7 +90,7 @@ lemma mem_continuousSquareIntegrable [𝓕.IsComplete P] {X : SquareIntegrable E
 
 /-- A square integrable martingale that is almost surely continuous is indistinguishable
 from a square integrable martingale that is continuous everywhere. -/
-lemma IsAESquareIntegrable.mk_mem_continuousSquareIntegrable [𝓕.IsComplete P]
+lemma IsAESquareIntegrable.mk_mem_continuousSquareIntegrable [Nonempty ι] [𝓕.IsComplete P]
     (hX1 : IsAESquareIntegrable X 𝓕 P) (hX2 : ∀ᵐ ω ∂P, Continuous (X · ω)) :
     .mk X hX1 ∈ continuousSquareIntegrable E P 𝓕 := by
   apply mem_continuousSquareIntegrable
@@ -101,7 +102,6 @@ lemma IsAESquareIntegrable.mk_mem_continuousSquareIntegrable [𝓕.IsComplete P]
 `M n` converges to `N` uniformly. This is needed to show that the space of continuous
 square integrable martingales is closed. -/
 lemma exists_subsequence_ae_tendsto_uniformly {M : ℕ → ι → Ω → E} {N : ι → Ω → E}
-    [OrderTopology ι] [SecondCountableTopology ι]
     (hM : ∀ n, IsAESquareIntegrable (M n) 𝓕 P) (hN : IsAESquareIntegrable N 𝓕 P)
     (h : Tendsto (fun n ↦ eLpNorm (𝓕.limitProcess (M n) P - 𝓕.limitProcess N P) 2 P) atTop (𝓝 0)) :
     ∃ φ : ℕ → ℕ, StrictMono φ ∧
@@ -169,7 +169,7 @@ lemma exists_subsequence_ae_tendsto_uniformly {M : ℕ → ι → Ω → E} {N :
 
 /-- The submodule of continuous square integrable martingales is closed in the Hilbert space
 of square integrable martingales. -/
-instance [𝓕.IsComplete P] [Nonempty ι] [OrderTopology ι] [SecondCountableTopology ι] :
+instance [𝓕.IsComplete P] [Nonempty ι] :
     IsClosed (continuousSquareIntegrable E P 𝓕 : Set (SquareIntegrable E P 𝓕)) := by
   refine IsSeqClosed.isClosed fun M N hM1 hM2 ↦ ?_
   have :
@@ -260,7 +260,6 @@ in the Hilbert space of square integrable martingales. -/
 noncomputable def discontinuousSquareIntegrable : Submodule ℝ (SquareIntegrable E P 𝓕) :=
   (continuousSquareIntegrable E P 𝓕).orthogonal
 
-omit [OrderTopology ι] in
 /-- A purely discontinuous square integrable martingale is in the submodule of purely discontinuous
 square integrable martingales. This statements links the predicate `IsPurelyDiscontinuous`
 with the submodule `discontinuousSquareIntegrable`. -/
@@ -272,7 +271,6 @@ lemma mem_discontinuousSquareIntegrable {Y : SquareIntegrable E P 𝓕}
   · exact X.isAESquareIntegrable_coe
   · exact ae_of_all _ <| continuous_coe hX
 
-omit [OrderTopology ι] in
 /-- A purely discontinuous square integrable martingale is in the submodule of purely discontinuous
 square integrable martingales. This statements links the predicate `IsPurelyDiscontinuous`
 with the submodule `discontinuousSquareIntegrable`. -/
@@ -385,6 +383,76 @@ lemma discontinuousPart_stoppedProcess [OrderBot ι] [Approximable 𝓕 P]
     (ae_of_all _ (fun ω ↦ (continuous_continuousPart X ω).stoppedProcess τ))
     ((isPurelyDiscontinuous_discontinuousPart hX).stoppedProcess hτ)
     (hX.stoppedProcess hτ) (by rw [this])
+
+variable [OrderBot ι]
+
+open scoped Classical in
+noncomputable def continuousPart' (X : ι → Ω → E) (𝓕 : Filtration ι mΩ) (P : Measure Ω)
+    [IsFiniteMeasure P] [𝓕.IsComplete P] : ι → Ω → E :=
+  if hX : IsLocallySquareIntegrable X 𝓕 P
+    then fun t ω ↦ limUnder atTop (fun n ↦ continuousPart (stoppedProcess X (hX.choose n)) 𝓕 P t ω)
+    else 0
+
+lemma continuous_continuousPart' [Approximable 𝓕 P] {X : ι → Ω → E}
+    (hX : IsLocallySquareIntegrable X 𝓕 P) :
+    ∀ᵐ ω ∂P, Continuous (continuousPart' X 𝓕 P · ω) := by
+  have hτ1 := hX.choose_spec.1
+  have hτ2 := hX.choose_spec.2
+  set τ := hX.choose with h3
+  have : ∀ᵐ ω ∂P, ∀ N, ∀ k, ∀ t,
+      continuousPart (stoppedProcess (stoppedProcess X (τ k)) (τ N)) 𝓕 P t ω =
+        stoppedProcess (continuousPart (stoppedProcess X (τ k)) 𝓕 P) (τ N) t ω := by
+    rw [ae_all_iff]
+    intro N
+    rw [ae_all_iff]
+    intro k
+    filter_upwards [continuousPart_stoppedProcess  (stoppedProcess X (τ k)) (τ N) (𝓕 := 𝓕)]
+    grind
+  filter_upwards [hτ1.tendsto_top, hτ1.mono, this] with ω hω hω' hω''
+  rw [continuous_iff_continuousAt]
+  intro t
+  have h1 := (WithTop.tendsto_nhds_top_iff (τ · ω)).1 hω t
+  obtain ⟨N, hN⟩ := eventually_atTop.1 h1
+  have (s : ι) (hs : s ≤ τ N ω) : continuousPart' X 𝓕 P s ω =
+      continuousPart (stoppedProcess X (τ N)) 𝓕 P s ω := by
+    rw [continuousPart', dif_pos hX]
+    apply Filter.Tendsto.limUnder_eq
+    apply tendsto_nhds_of_eventually_eq
+    rw [eventually_atTop]
+    use N
+    intro k hk
+    have : ∀ᵐ ω ∂P, ∀ t, stoppedProcess X (τ N) t ω =
+        stoppedProcess (stoppedProcess X (τ k)) (τ N) t ω := by
+      filter_upwards [hτ1.mono] with ω hω t
+      simp only [stoppedProcess]
+      rw [min_eq_left (b := τ k ω)]
+      · simp
+      obtain h1 | h1 := eq_or_ne (τ k ω) ⊤
+      · simp [h1]
+      rw [← WithTop.le_untopA_iff h1]
+      apply WithTop.untopA_mono h1
+      grw [min_le_right]
+      exact hω hk
+    rw [continuousPart_congr _ _ this, hω'', stoppedProcess, min_eq_left]
+    simp
+    rfl
+    grind
+  refine (continuous_continuousPart (stoppedProcess X (τ N)) ω (𝓕 := 𝓕) (P := P)).continuousAt.congr ?_
+  unfold Filter.EventuallyEq
+  rw [eventually_nhds_iff]
+  obtain h2 | h2 := eq_or_ne (τ N ω) ⊤
+  · use Set.univ
+    simp
+    intro s
+    rw [this]
+    simp [h2]
+  use Set.Iio (τ N ω).untopA
+  refine ⟨?_, isOpen_Iio, ?_⟩
+  · intro s (hs : s < _)
+    rw [WithTop.lt_untopA_iff h2] at hs
+    simp [this s hs.le]
+  · rw [Set.mem_Iio, WithTop.lt_untopA_iff h2]
+    exact hN N le_rfl
 
 end InnerProductSpace
 

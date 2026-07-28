@@ -25,21 +25,6 @@ variable {ι Ω E : Type*} [LinearOrder ι] [TopologicalSpace ι] [OrderTopology
   {mΩ : MeasurableSpace Ω} {𝓕 : Filtration ι mΩ} {μ : Measure Ω} [IsFiniteMeasure μ]
   {X : ι → Ω → E} {τ σ : Ω → WithTop ι} {n : ι}
 
-lemma stronglyMeasurable_stoppedValue (h : IsStronglyProgressive 𝓕 X)
-    (hRC : ∀ ω, IsRightContinuous (X · ω)) (hτ : IsStoppingTime 𝓕 τ) :
-    StronglyMeasurable[hτ.measurableSpace] (stoppedValue X τ) := by
-  rw [stronglyMeasurable_iff_measurable_separable]
-  constructor
-  · exact measurable_stoppedValue h hτ
-  · refine (omg ?_ hRC).mono ?_
-    · intro t
-      exact h.stronglyAdapted t |>.mono (𝓕.le t)
-    rintro - ⟨ω, rfl⟩
-    rw [stoppedValue]
-    simp
-
-variable [MetrizableSpace ι] [NormedSpace ℝ E] [CompleteSpace E]
-
 theorem condExp_stoppedValue_stopping_time_ae_eq_restrict_le_of_countable_range
     (h : Martingale X 𝓕 μ) (hRC : ∀ ω, IsRightContinuous (X · ω)) {i : ι} (hτ_le : ∀ x, τ x ≤ i)
     (hτ : IsStoppingTime 𝓕 τ) (hσ : IsStoppingTime 𝓕 σ)

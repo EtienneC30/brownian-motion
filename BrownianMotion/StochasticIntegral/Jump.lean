@@ -14,7 +14,7 @@ open Filter
 
 open scoped Topology
 
-variable {T E : Type*} [ConditionallyCompleteLinearOrder T] {f : T → E} {t : T}
+variable {T E : Type*} [LinearOrder T] {f : T → E} {t : T}
 
 open Classical in
 /-- The jump of a function at a point `t`, defined as the difference between the value of
@@ -40,7 +40,7 @@ lemma jump_of_covBy [AddGroup E] [TopologicalSpace E] {s : T} (h : s ⋖ t) : Δ
   exact CovBy.unique_left h_exists.choose_spec h
 
 @[simp]
-lemma leftLim_bot {T E : Type*} [ConditionallyCompleteLinearOrderBot T] [TopologicalSpace E]
+lemma leftLim_bot {T E : Type*} [LinearOrder T] [OrderBot T] [TopologicalSpace E]
     (f : T → E) :
     leftLim f ⊥ = f ⊥ := by
   let : TopologicalSpace T := Preorder.topology T
@@ -120,7 +120,7 @@ lemma jump_of_isBot (h : IsBot t) :
   rw [dif_neg this, leftLim_eq_of_eq_bot, sub_self]
   exact nhdsLT_eq_bot_iff.mpr (Or.inl h)
 
-lemma jump_bot {T : Type*} [ConditionallyCompleteLinearOrderBot T] [TopologicalSpace T]
+lemma jump_bot {T : Type*} [LinearOrder T] [OrderBot T] [TopologicalSpace T]
     [OrderTopology T] {f : T → E} :
     Δ f ⊥ = 0 := by simp
 

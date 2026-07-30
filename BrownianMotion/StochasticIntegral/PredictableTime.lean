@@ -232,4 +232,43 @@ theorem target [∀ ω (s : Set Ω), Decidable (ω ∈ s)] [TopologicalSpace ι]
           exact measure_mono (by simp)
     _ ≤ sSup S := final
 
+def IsThinSet (s : Set (ι × Ω)) (𝓕 : Filtration ι mΩ) : Prop :=
+  ∃ τ : ℕ → Ω → WithTop ι, (∀ n, IsStoppingTime 𝓕 (τ n)) ∧ s = ⋃ n, stochGraph (τ n)
+
+lemma IsThinSet.mono {s t : Set (ι × Ω)} (ht : IsThinSet t 𝓕) (hst : s ⊆ t)
+    [MeasurableSpace ι] [TopologicalSpace ι] [OrderTopology ι] [SecondCountableTopology ι]
+    [BorelSpace ι]
+    (hs' : IsStronglyProgressive 𝓕 (fun t ω ↦ s.indicator (1 : ι × Ω → ℝ) (t, ω))) :
+    IsThinSet s 𝓕 := by
+  obtain ⟨τ, hτ, rfl⟩ := ht
+  let L n : Set Ω := {ω | ∃ (h : τ n ω ≠ ⊤), ((τ n ω).untop h, ω) ∈ s}
+  classical
+  refine ⟨fun n ↦ (L n).piecewise (τ n) (fun _ ↦ ⊤), fun n ↦ isStoppingTime_piecewise (hτ n) ?_, ?_⟩
+  · rw [← measurable_indicator_const_iff (b := (1 : ℝ))]
+    have : (L n).indicator (fun _ ↦ (1 : ℝ)) =
+        {ω | τ n ω ≠ ⊤}.indicator
+          (stoppedValue (fun u ω ↦ s.indicator (1 : ι × Ω → ℝ) (u, ω)) (τ n)) := by
+      ext ω
+      cases h : τ n ω with
+      | top => simp [L, h]
+      | coe u => simp [h, Set.indicator, L, stoppedValue]
+    rw [this]
+    refine .indicator ?_ ((measurableSet_singleton ⊤).preimage (hτ n).measurable).compl
+    exact measurable_stoppedValue hs' (hτ n)
+  · ext uω
+    simp only [stochGraph, Set.piecewise, ne_eq, Set.mem_ofPred_eq, Set.mem_iUnion, L]
+    refine ⟨fun h ↦ ?_, fun ⟨n, hn⟩ ↦ ?_⟩
+    · have := hst h
+      simp only [stochGraph, Set.mem_iUnion, Set.mem_ofPred_eq] at this
+      obtain ⟨n, hn⟩ := this
+      refine ⟨n, ?_⟩
+      rw [if_pos, hn]
+      rw [← hn]
+      simpa
+    split_ifs at hn with h
+    · obtain ⟨h1, h2⟩ := h
+      rw! [← hn, WithTop.untop_coe] at h2
+      exact h2
+    · contradiction
+
 end MeasureTheory

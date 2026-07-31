@@ -21,7 +21,7 @@ section Preorder
 
 variable [Preorder ι] {𝓕 : Filtration ι mΩ}
 
-lemma isStoppingTime_piecewise [DecidablePred (· ∈ A)]
+lemma isStoppingTime_piecewise_top [DecidablePred (· ∈ A)]
     (hτ : IsStoppingTime 𝓕 τ) (hA : MeasurableSet[hτ.measurableSpace] A) :
     IsStoppingTime 𝓕 (A.piecewise τ (fun _ ↦ ⊤)) := by
   intro t
@@ -32,13 +32,16 @@ lemma isStoppingTime_piecewise [DecidablePred (· ∈ A)]
 
 variable [OrderBot ι]
 
+/-- The measurable space of the _strict past_ before `τ`. -/
 @[instance_reducible]
 def leftMeasurableSpace (𝓕 : Filtration ι mΩ) (τ : Ω → WithTop ι) : MeasurableSpace Ω :=
   𝓕 ⊥ ⊔ (MeasurableSpace.generateFrom {s | ∃ A t, MeasurableSet[𝓕 t] A ∧ s = A ∩ {ω | t < τ ω}})
 
+/-- A predictable time is a random time whose graph is a predictable set. -/
 def IsPredictableTime (𝓕 : Filtration ι mΩ) (τ : Ω → WithTop ι) : Prop :=
   MeasurableSet[𝓕.predictable] (stochIco τ (fun _ ↦ ⊤))
 
+/-- A predictable time is a stopping time. -/
 lemma IsPredictableTime.isStoppingTime (hτ : IsPredictableTime 𝓕 τ) :
     IsStoppingTime 𝓕 τ := by
   intro t
@@ -55,11 +58,15 @@ lemma IsPredictableTime.isStoppingTime (hτ : IsPredictableTime 𝓕 τ) :
     · exact (𝓕.mono h.le) A hA
     · convert MeasurableSet.empty
 
+/-- An accessible time is a stopping time whose graph is contained in the union of the graphs
+a sequence of predictable times. -/
 structure IsAccessibleTime (𝓕 : Filtration ι mΩ) (τ : Ω → WithTop ι) : Prop where
   isStoppingTime : IsStoppingTime 𝓕 τ
   stochIco_subset : ∃ σ : ℕ → Ω → WithTop ι,
     (∀ n, IsPredictableTime 𝓕 (σ n)) ∧ stochGraph τ ⊆ ⋃ n, stochGraph (σ n)
 
+/-- An inaccessible time is a stopping time `τ` such that for any predictable time `σ`,
+`P(σ = τ < ⊤) = 0`. -/
 structure IsInacessibleTime (𝓕 : Filtration ι mΩ) (τ : Ω → WithTop ι) (P : Measure Ω) : Prop where
   isStoppingTime : IsStoppingTime 𝓕 τ
   measure_eq_lt_top_eq_zero : ∀ σ, IsPredictableTime 𝓕 σ → P {ω | τ ω = σ ω ∧ σ ω < ⊤} = 0
@@ -114,6 +121,7 @@ theorem Set.iInter_prod {α β ι : Type*} {s : Set α} {t : ι → Set β} [hι
   simp only [Set.mem_prod, Set.mem_iInter]
   exact ⟨fun h i ↦ ⟨h.1 i, h.2⟩, fun h ↦ ⟨fun i ↦ (h i).1, (h Classical.ofNonempty).2⟩⟩
 
+/-- A constant time is predictable. -/
 lemma IsPredictableTime.const [TopologicalSpace ι] [OrderTopology ι] [FirstCountableTopology ι]
     (𝓕 : Filtration ι mΩ) (t : WithTop ι) :
     IsPredictableTime 𝓕 (fun _ ↦ t) := by
@@ -187,8 +195,8 @@ theorem IsStoppingTime.decompositon
       hτ.measurableSet_lt_top
   let B := ⋃ n, ⋃ k, A n k
   have mB : MeasurableSet[hτ.measurableSpace] B := .iUnion fun n ↦ .iUnion fun k ↦ (mA n k)
-  refine ⟨B, mB, by simp +contextual [A, B], ⟨isStoppingTime_piecewise hτ mB, ?_⟩,
-    ⟨isStoppingTime_piecewise hτ mB.compl, fun π hπ ↦ ?_⟩⟩
+  refine ⟨B, mB, by simp +contextual [A, B], ⟨isStoppingTime_piecewise_top hτ mB, ?_⟩,
+    ⟨isStoppingTime_piecewise_top hτ mB.compl, fun π hπ ↦ ?_⟩⟩
   · obtain ⟨φ, hφ⟩ := exists_surjective_nat (ℕ × ℕ)
     refine ⟨fun n ↦ σ (φ n).1 (φ n).2, fun n ↦ hσ1 _ _, fun tω h ↦ ?_⟩
     simp only [stochGraph, Set.piecewise, Set.mem_iUnion, Set.mem_ofPred_eq, B, A] at h ⊢

@@ -282,7 +282,8 @@ lemma IsThinSet.mono {s t : Set (ι × Ω)} (ht : IsThinSet t 𝓕) (hst : s ⊆
   obtain ⟨τ, hτ, rfl⟩ := ht
   let L n : Set Ω := {ω | ∃ (h : τ n ω ≠ ⊤), ((τ n ω).untop h, ω) ∈ s}
   classical
-  refine ⟨fun n ↦ (L n).piecewise (τ n) (fun _ ↦ ⊤), fun n ↦ isStoppingTime_piecewise (hτ n) ?_, ?_⟩
+  refine ⟨fun n ↦ (L n).piecewise (τ n) (fun _ ↦ ⊤), fun n ↦ isStoppingTime_piecewise_top (hτ n) ?_,
+    ?_⟩
   · rw [← measurable_indicator_const_iff (b := (1 : ℝ))]
     have : (L n).indicator (fun _ ↦ (1 : ℝ)) =
         {ω | τ n ω ≠ ⊤}.indicator

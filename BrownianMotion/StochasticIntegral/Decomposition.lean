@@ -16,7 +16,7 @@ open MeasureTheory ProbabilityTheory Function Filter
 open scoped Topology
 
 variable {ι Ω E : Type*} {mΩ : MeasurableSpace Ω} [NormedAddCommGroup E]
-  [NormedSpace ℝ E] {P : Measure Ω} {X : ι → Ω → E} {ε : ℝ} {s t : ι}
+  [NormedSpace ℝ E] {P : Measure Ω} {X : ι → Ω → E} {ε : ℝ} {s t : ι} {n : ℕ}
 
 section LinearOrder
 
@@ -82,18 +82,30 @@ end LinearOrder
 
 variable [ConditionallyCompleteLinearOrderBot ι] {𝓕 : Filtration ι mΩ}
 
-private def aux_time (ε : ℝ) : ℕ → Ω → WithTop ι
+private noncomputable def auxTime (X : ι → Ω → E) (ε : ℝ) : ℕ → Ω → WithTop ι
   | 0 => ⊤
-  | n + 1 => fun ω ↦ sInf {t : WithTop ι | ∃ (h : t ≠ ⊤) ∧ ε ≤ ‖X (aux_time ε n ω) ω - X s ω‖ ∧
-      1 / 2 ^ k ≤ ‖X (T k n) ω - X s ω + Δ (X · ω) s‖}
+  | n + 1 => fun ω ↦ if auxTime X ε n ω = ⊤ then ⊤ else
+      sInf {t : WithTop ι | (t ≠ ⊤) ∧ ε ≤ ‖X (auxTime X ε n ω).untopA ω - X t.untopA ω‖ ∧
+      ε ≤ ‖X (auxTime X ε n ω).untopA ω - X t.untopA ω + Δ (X · ω) t.untopA‖}
+
+private lemma isStoppingTime_auxTime : IsStoppingTime 𝓕 (auxTime X ε n) := by sorry
 
 lemma isThinSet_jumpSet [TopologicalSpace ι] [OrderTopology ι]
     [SecondCountableTopology ι] (hX1 : StronglyAdapted 𝓕 X) (hX2 : ∀ ω, IsCadlag (X · ω)) :
     IsThinSet {(t, ω) | ⊥ < t ∧ Δ (X · ω) t ≠ 0} 𝓕 := by
-  let T (k : ℕ) : ℕ → Ω → WithTop ι :=
-    | 0 => ⊥
-    | n + 1 => fun ω ↦ sInf {t | ∃ s : ι, t = s ∧ 1 / 2 ^ k ≤ ‖X (T k n) ω - X s ω‖ ∧
-        1 / 2 ^ k ≤ ‖X (T k n) ω - X s ω + Δ (X · ω) s‖}
+  let T (k : ℕ) n ω : WithTop ι := auxTime X (1 / 2 ^ k) n ω
+  have hT k n : IsStoppingTime 𝓕 (T k n) := isStoppingTime_auxTime
+  obtain ⟨φ, hφ⟩ := exists_surjective_nat (ℕ × ℕ)
+  borelize ι
+  refine .mono ⟨fun n ↦ T (φ n).1 (φ n).2, fun n ↦ hT (φ n).1 (φ n).2, rfl⟩ ?_ ?_
+  · intro (t, ω) htω
+    simp only [ne_eq, Set.mem_ofPred_eq] at htω
+    have := norm_pos_iff.2 htω.2
+    obtain ⟨k, hk⟩ : ∃ k : ℕ, 2 / 2 ^ k ≤ ‖Δ (X · ω) t‖ := by
+      refine Eventually.exists (f := atTop) (Filter.Tendsto.eventually ?_ (eventually_le_nhds this))
+      apply Tendsto.const_div_atTop
+      convert tendsto_natCast_atTop_atTop.comp <| tendsto_rpow_atTop (by simp)
+      sorry
 
 nonrec lemma IsCadlag.largeJumpProcess [TopologicalSpace ι] {ω : Ω} (hX : IsCadlag (X · ω)) :
     IsCadlag (largeJumpProcess X ε · ω) := by

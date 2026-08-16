@@ -90,6 +90,12 @@ private noncomputable def auxTime (X : ι → Ω → E) (ε : ℝ) : ℕ → Ω 
 
 private lemma isStoppingTime_auxTime : IsStoppingTime 𝓕 (auxTime X ε n) := by sorry
 
+private lemma tendsto_auxTime_atTop (hε : 0 < ε) (ω : Ω) :
+    letI : TopologicalSpace ι := Preorder.topology ι
+    haveI : OrderTopology ι := ⟨rfl⟩
+    Tendsto (auxTime X ε · ω) atTop (𝓝 ⊤) := by
+  sorry
+
 lemma isThinSet_jumpSet [TopologicalSpace ι] [OrderTopology ι]
     [SecondCountableTopology ι] (hX1 : StronglyAdapted 𝓕 X) (hX2 : ∀ ω, IsCadlag (X · ω)) :
     IsThinSet {(t, ω) | ⊥ < t ∧ Δ (X · ω) t ≠ 0} 𝓕 := by
@@ -104,7 +110,17 @@ lemma isThinSet_jumpSet [TopologicalSpace ι] [OrderTopology ι]
     obtain ⟨k, hk⟩ : ∃ k : ℕ, 2 / 2 ^ k ≤ ‖Δ (X · ω) t‖ := by
       refine Eventually.exists (f := atTop) (Filter.Tendsto.eventually ?_ (eventually_le_nhds this))
       apply Tendsto.const_div_atTop
-      convert tendsto_natCast_atTop_atTop.comp <| tendsto_rpow_atTop (by simp)
+      convert (tendsto_rpow_atTop_of_base_gt_one 2 (by simp)).comp tendsto_natCast_atTop_atTop
+      ext; simp
+    obtain ⟨n, hn⟩ : ∃ (n : ℕ), T k n ω ≤ t ∧ t < T k (n + 1) ω := by
+      classical
+      refine ⟨Nat.find (p := fun n ↦ t < T k (n + 1) ω) ?_, ?_, ?_⟩
+      · have : Tendsto (T k · ω) atTop (𝓝 ⊤) := by
+          apply tendsto_auxTime_atTop
+          positivity
+        exact WithTop.tendsto_nhds_top_iff _ |>.1 (this.comp (tendsto_add_atTop_nat 1)) t |>.exists
+      · by_contra! h
+        -- convert WithTop.tendsto_nhds_top_iff _ |>.1 (tendsto_auxTime_atTop (by positivity) ω) t |>.exists
       sorry
 
 nonrec lemma IsCadlag.largeJumpProcess [TopologicalSpace ι] {ω : Ω} (hX : IsCadlag (X · ω)) :
